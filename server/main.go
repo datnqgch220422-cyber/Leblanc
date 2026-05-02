@@ -33,7 +33,6 @@ func main() {
 
 	// REST API endpoints
 	r.GET("/", func(c *gin.Context) { c.JSON(200, gin.H{"msg": "LeBlanc Go API with REST & GraphQL."}) })
-	r.GET("/users", handlers.GetUsers)
 	r.GET("/drinks", handlers.GetDrinks)
 	r.POST("/reco/from-features", handlers.RecoFromFeatures)
 	r.POST("/bookings", handlers.CreateBooking)
@@ -41,6 +40,25 @@ func main() {
 	r.POST("/auth/login", handlers.LoginUser)
 	r.POST("/auth/request-verify", handlers.RequestVerify)
 	r.POST("/auth/verify", handlers.VerifyToken)
+
+	admin := r.Group("/admin")
+	admin.Use(handlers.RequireAdminAuth())
+	{
+		admin.GET("/users", handlers.AdminListUsers)
+		admin.POST("/users", handlers.AdminCreateUser)
+		admin.PUT("/users/:id", handlers.AdminUpdateUser)
+		admin.DELETE("/users/:id", handlers.AdminDeleteUser)
+
+		admin.GET("/bookings", handlers.AdminListBookings)
+		admin.POST("/bookings", handlers.AdminCreateBooking)
+		admin.PUT("/bookings/:id", handlers.AdminUpdateBooking)
+		admin.DELETE("/bookings/:id", handlers.AdminDeleteBooking)
+
+		admin.GET("/drinks", handlers.AdminListDrinks)
+		admin.POST("/drinks", handlers.AdminCreateDrink)
+		admin.PUT("/drinks/:id", handlers.AdminUpdateDrink)
+		admin.DELETE("/drinks/:id", handlers.AdminDeleteDrink)
+	}
 
 	// GraphQL endpoint
 	r.POST("/graphql", graph.Handler())

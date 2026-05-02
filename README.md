@@ -28,8 +28,9 @@ If you re-run the seeder it will skip inserting drinks when the collection is no
 
 ```bash
 cd website/LeBlanc\ web
-npm install
-npm run dev
+npm install   
+npm run dev         ## for local
+vercel --prod       ## for deployed 
 ```
 
 Configure `VITE_API_BASE` in `website/LeBlanc web/.env` if the backend is not on `http://localhost:4000`.

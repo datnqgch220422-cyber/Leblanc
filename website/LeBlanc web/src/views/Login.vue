@@ -1,70 +1,75 @@
 <script setup>
-import { reactive, ref } from 'vue'
-import { useRouter, RouterLink } from 'vue-router'
-import { loginUser } from '@/api'
+import { reactive, ref } from "vue";
+import { useRouter, RouterLink } from "vue-router";
+import { loginUser } from "@/api";
+import {
+  ADMIN_HOME_PATH,
+  isAdminUser,
+  persistSession,
+} from "@/composables/useSessionAuth";
 
-const router = useRouter()
-const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL || '').toLowerCase()
+const router = useRouter();
 const form = reactive({
-  name: '',
-  password: '',
-})
+  name: "",
+  password: "",
+});
 
-const loading = ref(false)
-const error = ref('')
-const message = ref('')
+const loading = ref(false);
+const error = ref("");
+const message = ref("");
 
-const persistUser = (user) => {
-  try {
-    localStorage.setItem('leblancUser', JSON.stringify(user))
-    window.dispatchEvent(new CustomEvent('leblanc-user-updated', { detail: user }))
-  } catch (err) {
-    console.warn('Could not persist user', err)
-  }
-}
-
-const isAdmin = (user) => {
-  const email = user?.email?.toLowerCase() || ''
-  return ADMIN_EMAIL && email === ADMIN_EMAIL
-}
+const getSafeRedirect = () => {
+  const redirect = router.currentRoute.value.query.redirect;
+  return typeof redirect === "string" && redirect.startsWith("/")
+    ? redirect
+    : "";
+};
 
 const handleSubmit = async () => {
-  error.value = ''
-  message.value = ''
+  error.value = "";
+  message.value = "";
 
   if (!form.name || !form.password) {
-    error.value = 'Please provide both your name and password.'
-    return
+    error.value = "Please provide both your name and password.";
+    return;
   }
 
-  loading.value = true
+  loading.value = true;
   try {
     const res = await loginUser({
       name: form.name,
       password: form.password,
-    })
-    persistUser(res.user)
-    const target = isAdmin(res.user) ? '/admin' : '/'
-    message.value = `Welcome back, ${res.user.name}!`
-    setTimeout(() => router.push(target), 600)
+    });
+    persistSession({
+      user: res.user,
+      token: res.token || "",
+    });
+    const fallbackTarget = isAdminUser(res.user) ? ADMIN_HOME_PATH : "/";
+    const target = getSafeRedirect() || fallbackTarget;
+    message.value = `Welcome back, ${res.user.name}!`;
+    setTimeout(() => router.push(target), 600);
   } catch (err) {
     // Fallback message first to guarantee something shows.
-    error.value = 'Unable to sign you in. Please try again.'
-    const status = err?.response?.status
-    const raw = err?.response?.data?.error || ''
-    const lower = raw.toLowerCase()
-    if (lower.includes('user') || lower.includes('name') || lower.includes('found')) {
-      error.value = 'Wrong User Name. Please correct it.'
-    } else if (lower.includes('password')) {
-      error.value = 'Wrong Password. Please correct it.'
+    error.value = "Unable to sign you in. Please try again.";
+    const status = err?.response?.status;
+    const raw = err?.response?.data?.error || "";
+    const lower = raw.toLowerCase();
+    if (
+      lower.includes("user") ||
+      lower.includes("name") ||
+      lower.includes("found")
+    ) {
+      error.value = "Wrong User Name. Please correct it.";
+    } else if (lower.includes("password")) {
+      error.value = "Wrong Password. Please correct it.";
     } else if (status === 401) {
       // If only status is known, assume wrong password.
-      error.value = 'Wrong Password. Please correct it.'
+      error.value = "Wrong Password. Please correct it.";
     }
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 </script>
 
 <template>
@@ -78,7 +83,12 @@ const handleSubmit = async () => {
       <form class="auth-form" @submit.prevent="handleSubmit">
         <label class="field">
           <span>Name</span>
-          <input v-model="form.name" type="text" placeholder="E.g. Jackie Nguyen" autocomplete="username" />
+          <input
+            v-model="form.name"
+            type="text"
+            placeholder="E.g. Jackie Nguyen"
+            autocomplete="username"
+          />
         </label>
 
         <label class="field">
@@ -96,7 +106,9 @@ const handleSubmit = async () => {
             <span v-if="loading">Signing in...</span>
             <span v-else>Log in</span>
           </button>
-          <RouterLink to="/register" class="btn-link">Create account</RouterLink>
+          <RouterLink to="/register" class="btn-link"
+            >Create account</RouterLink
+          >
         </div>
       </form>
 
@@ -122,8 +134,9 @@ const handleSubmit = async () => {
 }
 
 .auth-visual {
-  background: linear-gradient(160deg, rgba(15, 20, 36, 0.7), rgba(0, 0, 0, 0.2)),
-    url('https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=1400&q=80')
+  background:
+    linear-gradient(160deg, rgba(15, 20, 36, 0.7), rgba(0, 0, 0, 0.2)),
+    url("https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=1400&q=80")
       center/cover no-repeat;
 }
 
@@ -131,7 +144,11 @@ const handleSubmit = async () => {
   padding: clamp(24px, 5vw, 48px);
   display: grid;
   gap: 16px;
-  background: linear-gradient(145deg, rgba(246, 239, 230, 0.06), rgba(246, 239, 230, 0.12));
+  background: linear-gradient(
+    145deg,
+    rgba(246, 239, 230, 0.06),
+    rgba(246, 239, 230, 0.12)
+  );
   backdrop-filter: blur(6px);
 }
 
@@ -140,7 +157,7 @@ const handleSubmit = async () => {
   letter-spacing: 0.24em;
   text-transform: uppercase;
   font-size: 0.78rem;
-  font-family: 'Georgia', 'Times New Roman', serif;
+  font-family: "Georgia", "Times New Roman", serif;
   color: #e9d7b6;
 }
 
@@ -203,7 +220,10 @@ h1 {
   font-weight: 800;
   letter-spacing: 0.02em;
   cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
 }
 
 .btn-primary:hover {

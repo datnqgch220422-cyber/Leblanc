@@ -1,43 +1,40 @@
 <script setup>
-import { ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { verifyToken } from '@/api'
-import darkLogo from '@/assets/dark-logo.png'
+import { ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { verifyToken } from "@/api";
+import { persistSessionUser } from "@/composables/useSessionAuth";
+import darkLogo from "@/assets/dark-logo.png";
 
-const route = useRoute()
-const router = useRouter()
-const token = ref(route.query.token || '')
-const loading = ref(false)
-const message = ref('')
-const error = ref('')
+const route = useRoute();
+const router = useRouter();
+const token = ref(route.query.token || "");
+const loading = ref(false);
+const message = ref("");
+const error = ref("");
 
 const handleVerify = async () => {
-  error.value = ''
-  message.value = ''
+  error.value = "";
+  message.value = "";
   if (!token.value) {
-    error.value = 'Missing token. Please use the link from your email.'
-    return
+    error.value = "Missing token. Please use the link from your email.";
+    return;
   }
-  loading.value = true
+  loading.value = true;
   try {
-    const res = await verifyToken({ token: token.value })
-    const user = res?.data?.user || res?.user
+    const res = await verifyToken({ token: token.value });
+    const user = res?.data?.user || res?.user;
     if (user) {
-      try {
-        localStorage.setItem('leblancUser', JSON.stringify(user))
-        window.dispatchEvent(new CustomEvent('leblanc-user-updated', { detail: user }))
-      } catch (err) {
-        console.warn('Could not persist verified user', err)
-      }
+      persistSessionUser(user);
     }
-    message.value = 'Email verified! Redirecting...'
-    setTimeout(() => router.push('/'), 800)
+    message.value = "Email verified! Redirecting...";
+    setTimeout(() => router.push("/"), 800);
   } catch (err) {
-    error.value = err?.response?.data?.error || 'Verification failed. Please try again.'
+    error.value =
+      err?.response?.data?.error || "Verification failed. Please try again.";
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 </script>
 
 <template>

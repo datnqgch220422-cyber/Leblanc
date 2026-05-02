@@ -1,33 +1,15 @@
 <script setup>
-import { onMounted, ref } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { ref } from "vue";
+import { RouterLink, useRouter } from "vue-router";
+import { clearSessionUser, getSessionUser } from "@/composables/useSessionAuth";
 
-const router = useRouter()
-const user = ref(null)
-
-const loadUser = () => {
-  try {
-    return JSON.parse(localStorage.getItem('leblancUser') || 'null')
-  } catch (err) {
-    console.warn('Could not parse stored user', err)
-    return null
-  }
-}
-
-const hydrate = () => {
-  user.value = loadUser()
-  if (!user.value) {
-    router.replace('/login')
-  }
-}
-
-onMounted(hydrate)
+const router = useRouter();
+const user = ref(getSessionUser());
 
 const logout = () => {
-  localStorage.removeItem('leblancUser')
-  window.dispatchEvent(new CustomEvent('leblanc-user-updated', { detail: null }))
-  router.push('/login')
-}
+  clearSessionUser();
+  router.push("/login");
+};
 </script>
 
 <template>
@@ -36,13 +18,15 @@ const logout = () => {
       <div>
         <p class="eyebrow">Le'Blanc</p>
         <h1>Your account</h1>
-        <p class="lede">View who is signed in and jump back to the experience.</p>
+        <p class="lede">
+          View who is signed in and jump back to the experience.
+        </p>
       </div>
       <RouterLink to="/" class="btn-ghost">Back to home</RouterLink>
     </header>
 
     <div class="card" v-if="user">
-      <div class="avatar">{{ (user.name?.[0] || 'A').toUpperCase() }}</div>
+      <div class="avatar">{{ (user.name?.[0] || "A").toUpperCase() }}</div>
       <div class="meta">
         <p class="name">{{ user.name }}</p>
         <p class="email">{{ user.email }}</p>
@@ -96,7 +80,11 @@ h1 {
   gap: 14px;
   padding: 18px 20px;
   border-radius: 14px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(246, 239, 230, 0.8));
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.9),
+    rgba(246, 239, 230, 0.8)
+  );
   border: 1px solid rgba(0, 0, 0, 0.06);
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.08);
 }
@@ -128,7 +116,8 @@ h1 {
   font-size: 1.2rem;
 }
 
-.email, .id {
+.email,
+.id {
   margin: 0;
   color: rgba(0, 0, 0, 0.7);
   word-break: break-all;

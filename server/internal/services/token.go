@@ -11,41 +11,13 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"leblanc/server/internal/models"
 )
-
-var (
-	tokenSecret []byte
-	tokenTTL    time.Duration
-	regTTL      time.Duration
-)
-
-func init() {
-	secret := os.Getenv("TOKEN_SECRET")
-	if secret == "" {
-		secret = "change-me-token-secret"
-	}
-	tokenSecret = []byte(secret)
-
-	ttlMinutes := 30
-	if v := os.Getenv("VERIFICATION_TTL_MIN"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			ttlMinutes = n
-		}
-	}
-	tokenTTL = time.Duration(ttlMinutes) * time.Minute
-
-	regTTLMinutes := 60
-	if v := os.Getenv("REGISTRATION_TTL_MIN"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			regTTLMinutes = n
-		}
-	}
-	regTTL = time.Duration(regTTLMinutes) * time.Minute
-}
 
 // GenerateVerificationToken creates a HMAC-SHA256 signed token that encodes the email and expiry.
 func GenerateVerificationToken(email string) (token string, expiresAt time.Time) {
-	expiresAt = time.Now().Add(tokenTTL)
+	expiresAt = time.Now().Add(verificationTTL())
 	payload := email + "|" + strconv.FormatInt(expiresAt.Unix(), 10)
 	sig := signPayload(payload)
 	raw := payload + "|" + sig
@@ -93,7 +65,7 @@ type RegistrationClaims struct {
 
 // GenerateRegistrationToken signs registration claims (name/email/password hash/role) with expiry.
 func GenerateRegistrationToken(claims RegistrationClaims) (token string, expiresAt time.Time, err error) {
-	expiresAt = time.Now().Add(regTTL)
+	expiresAt = time.Now().Add(registrationTTL())
 	claims.Exp = expiresAt.Unix()
 	b, err := json.Marshal(claims)
 	if err != nil {
@@ -139,8 +111,104 @@ func VerifyRegistrationToken(token string) (*RegistrationClaims, error) {
 	return &claims, nil
 }
 
+type SessionClaims struct {
+	UserID string `json:"userId"`
+	Email  string `json:"email"`
+	Role   string `json:"role"`
+	Exp    int64  `json:"exp"`
+}
+
+func GenerateSessionToken(user models.User) (token string, expiresAt time.Time, err error) {
+	expiresAt = time.Now().Add(sessionTTL())
+	claims := SessionClaims{
+		UserID: user.ID.Hex(),
+		Email:  user.Email,
+		Role:   user.Role,
+		Exp:    expiresAt.Unix(),
+	}
+	b, err := json.Marshal(claims)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	payload := base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(b)
+	sig := signPayload(payload)
+	raw := payload + "|" + sig
+	token = base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString([]byte(raw))
+	return token, expiresAt, nil
+}
+
+func VerifySessionToken(token string) (*SessionClaims, error) {
+	if token == "" {
+		return nil, errors.New("missing token")
+	}
+	decoded, err := base64.URLEncoding.WithPadding(base64.NoPadding).DecodeString(token)
+	if err != nil {
+		return nil, errors.New("invalid token encoding")
+	}
+	parts := strings.Split(string(decoded), "|")
+	if len(parts) != 2 {
+		return nil, errors.New("invalid token structure")
+	}
+	payload := parts[0]
+	sig := parts[1]
+	expectedSig := signPayload(payload)
+	if !hmac.Equal([]byte(expectedSig), []byte(sig)) {
+		return nil, errors.New("invalid signature")
+	}
+	payloadBytes, err := base64.URLEncoding.WithPadding(base64.NoPadding).DecodeString(payload)
+	if err != nil {
+		return nil, errors.New("invalid payload encoding")
+	}
+	var claims SessionClaims
+	if err := json.Unmarshal(payloadBytes, &claims); err != nil {
+		return nil, errors.New("invalid claims")
+	}
+	if claims.UserID == "" || claims.Exp == 0 {
+		return nil, errors.New("invalid claims")
+	}
+	if time.Now().After(time.Unix(claims.Exp, 0)) {
+		return nil, errors.New("token expired")
+	}
+	return &claims, nil
+}
+
+func tokenSecret() []byte {
+	secret := strings.TrimSpace(os.Getenv("TOKEN_SECRET"))
+	if secret == "" {
+		secret = "change-me-token-secret"
+	}
+	return []byte(secret)
+}
+
+func verificationTTL() time.Duration {
+	return envDurationMinutes("VERIFICATION_TTL_MIN", 30)
+}
+
+func registrationTTL() time.Duration {
+	return envDurationMinutes("REGISTRATION_TTL_MIN", 60)
+}
+
+func sessionTTL() time.Duration {
+	if v := strings.TrimSpace(os.Getenv("SESSION_TTL_HOURS")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return time.Duration(n) * time.Hour
+		}
+	}
+	return envDurationMinutes("SESSION_TTL_MIN", 12*60)
+}
+
+func envDurationMinutes(key string, fallback int) time.Duration {
+	minutes := fallback
+	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			minutes = n
+		}
+	}
+	return time.Duration(minutes) * time.Minute
+}
+
 func signPayload(payload string) string {
-	h := hmac.New(sha256.New, tokenSecret)
+	h := hmac.New(sha256.New, tokenSecret())
 	h.Write([]byte(payload))
 	return hex.EncodeToString(h.Sum(nil))
 }

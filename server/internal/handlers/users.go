@@ -41,11 +41,6 @@ type verifyTokenRequest struct {
 	Token string `json:"token"`
 }
 
-var adminEmailLower = strings.ToLower(os.Getenv("ADMIN_EMAIL"))
-
-// Require MX check by default; set EMAIL_REQUIRE_MX=false to disable.
-var requireMXCheck = !strings.EqualFold(os.Getenv("EMAIL_REQUIRE_MX"), "false")
-
 func GetUsers(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -75,7 +70,7 @@ func GetUsers(c *gin.Context) {
 func RegisterUser(c *gin.Context) {
 	var req registerRequest
 	if err := c.BindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -84,22 +79,22 @@ func RegisterUser(c *gin.Context) {
 	req.Password = strings.TrimSpace(req.Password)
 
 	if req.Name == "" || req.Email == "" || req.Password == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "name, email and password are required"})
+		respondError(c, http.StatusBadRequest, "name, email and password are required")
 		return
 	}
 	if !isValidEmail(req.Email) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid email"})
+		respondError(c, http.StatusBadRequest, "invalid email")
 		return
 	}
 	// MX lookup: if no MX -> invalid; if lookup errors -> log and allow (to avoid blocking due to DNS issues).
-	if requireMXCheck {
+	if emailRequiresMXCheck() {
 		if ok := hasMXRecord(req.Email); !ok {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid email"})
+			respondError(c, http.StatusBadRequest, "invalid email")
 			return
 		}
 	}
-	if adminEmailLower != "" && strings.ToLower(req.Email) == adminEmailLower {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "this email is reserved"})
+	if reservedAdminEmailLower() != "" && strings.ToLower(req.Email) == reservedAdminEmailLower() {
+		respondError(c, http.StatusBadRequest, "this email is reserved")
 		return
 	}
 
@@ -116,16 +111,16 @@ func RegisterUser(c *gin.Context) {
 		{"emailLower": lowerEmail},
 	}}
 	if err := coll.FindOne(ctx, filter).Err(); err == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "user already exists"})
+		respondError(c, http.StatusConflict, "user already exists")
 		return
 	} else if err != mongo.ErrNoDocuments {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not hash password"})
+		respondError(c, http.StatusInternalServerError, "could not hash password")
 		return
 	}
 
@@ -143,7 +138,7 @@ func RegisterUser(c *gin.Context) {
 		CreatedAt:    time.Now(),
 	}
 	if _, err := coll.InsertOne(ctx, user); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not create user"})
+		respondError(c, http.StatusInternalServerError, "could not create user")
 		return
 	}
 
@@ -155,7 +150,7 @@ func RegisterUser(c *gin.Context) {
 	}
 	token, expiresAt, err := services.GenerateRegistrationToken(claims)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not generate token"})
+		respondError(c, http.StatusInternalServerError, "could not generate token")
 		return
 	}
 	verifyURLBase := strings.TrimSpace(os.Getenv("FRONTEND_VERIFY_URL"))
@@ -163,7 +158,7 @@ func RegisterUser(c *gin.Context) {
 	if verifyURLBase != "" {
 		verifyURL = fmt.Sprintf("%s?token=%s", strings.TrimRight(verifyURLBase, "/"), token)
 	}
-	log.Printf("register-init: email=%s token=%s verifyUrl=%s", req.Email, token, verifyURL)
+	log.Printf("register-init: email=%s verifyUrlGenerated=%t", req.Email, verifyURL != "")
 
 	c.JSON(http.StatusCreated, gin.H{
 		"ok":        true,
@@ -177,14 +172,14 @@ func RegisterUser(c *gin.Context) {
 func LoginUser(c *gin.Context) {
 	var req loginRequest
 	if err := c.BindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	req.NameOrEmail = strings.TrimSpace(req.NameOrEmail)
 	req.Password = strings.TrimSpace(req.Password)
 	if req.NameOrEmail == "" || req.Password == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "name and password are required"})
+		respondError(c, http.StatusBadRequest, "name and password are required")
 		return
 	}
 
@@ -203,36 +198,47 @@ func LoginUser(c *gin.Context) {
 	var user models.User
 	if err := coll.FindOne(ctx, filter).Decode(&user); err != nil {
 		if err == mongo.ErrNoDocuments {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found"})
+			respondError(c, http.StatusUnauthorized, "user not found")
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			respondError(c, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "incorrect password"})
+		respondError(c, http.StatusUnauthorized, "incorrect password")
 		return
 	}
 
 	if !user.Verified {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "email not verified"})
+		respondError(c, http.StatusUnauthorized, "email not verified")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"ok": true, "user": user.Public()})
+	token, expiresAt, err := services.GenerateSessionToken(user)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "could not create session")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"ok":        true,
+		"user":      user.Public(),
+		"token":     token,
+		"expiresAt": expiresAt,
+	})
 }
 
 // Request verification token (e.g., to send via email).
 func RequestVerify(c *gin.Context) {
 	var req verifyRequest
 	if err := c.BindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 	req.Email = strings.TrimSpace(req.Email)
 	if req.Email == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "email is required"})
+		respondError(c, http.StatusBadRequest, "email is required")
 		return
 	}
 	token, expiresAt := services.GenerateVerificationToken(req.Email)
@@ -246,7 +252,7 @@ func RequestVerify(c *gin.Context) {
 func VerifyToken(c *gin.Context) {
 	var req verifyTokenRequest
 	if err := c.BindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 	// Try registration token first (contains user data).
@@ -273,7 +279,7 @@ func VerifyToken(c *gin.Context) {
 				user.Role = "user"
 			}
 			if _, err := coll.InsertOne(ctx, user); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				respondError(c, http.StatusInternalServerError, err.Error())
 				return
 			}
 			c.JSON(http.StatusOK, gin.H{"ok": true, "email": claims.Email, "user": user.Public()})
@@ -307,7 +313,7 @@ func VerifyToken(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"ok": true, "email": claims.Email, "user": updated.Public()})
 			return
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			respondError(c, http.StatusInternalServerError, err.Error())
 			return
 		}
 	}
@@ -315,7 +321,7 @@ func VerifyToken(c *gin.Context) {
 	// Fallback: legacy simple email token.
 	email, err := services.VerifyToken(req.Token)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		respondError(c, http.StatusUnauthorized, err.Error())
 		return
 	}
 	filter := bson.M{"emailLower": strings.ToLower(email)}
@@ -341,4 +347,12 @@ func hasMXRecord(addr string) bool {
 		return false
 	}
 	return len(mx) > 0
+}
+
+func reservedAdminEmailLower() string {
+	return strings.ToLower(strings.TrimSpace(os.Getenv("ADMIN_EMAIL")))
+}
+
+func emailRequiresMXCheck() bool {
+	return !strings.EqualFold(strings.TrimSpace(os.Getenv("EMAIL_REQUIRE_MX")), "false")
 }

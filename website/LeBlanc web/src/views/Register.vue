@@ -1,69 +1,63 @@
 <script setup>
-import { reactive, ref } from 'vue'
-import { useRouter, RouterLink } from 'vue-router'
-import { registerUser } from '@/api'
-import { sendVerificationEmail, isEmailReady } from '@/email'
+import { reactive, ref } from "vue";
+import { RouterLink } from "vue-router";
+import { registerUser } from "@/api";
+import { sendVerificationEmail, isEmailReady } from "@/email";
 
-const router = useRouter()
-const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL || '').toLowerCase()
 const form = reactive({
-  name: '',
-  email: '',
-  password: '',
-})
+  name: "",
+  email: "",
+  password: "",
+});
 
-const loading = ref(false)
-const error = ref('')
-const message = ref('')
-
-const isAdmin = (user) => {
-  const email = user?.email?.toLowerCase() || ''
-  return ADMIN_EMAIL && email === ADMIN_EMAIL
-}
+const loading = ref(false);
+const error = ref("");
+const message = ref("");
 
 const handleSubmit = async () => {
-  error.value = ''
-  message.value = ''
+  error.value = "";
+  message.value = "";
 
   if (!form.name || !form.email || !form.password) {
-    error.value = 'Please fill out your name, Gmail and password.'
-    return
+    error.value = "Please fill out your name, Gmail and password.";
+    return;
   }
 
-  loading.value = true
+  loading.value = true;
   try {
     const res = await registerUser({
       name: form.name,
       email: form.email,
       password: form.password,
-    })
+    });
     if (isEmailReady()) {
       try {
         await sendVerificationEmail(form.email, form.name, {
           token: res.token,
           verifyLink: res.verifyUrl,
           expiresAt: res.expiresAt,
-        })
+        });
       } catch (mailErr) {
-        console.warn('Could not send verification email', mailErr)
-        error.value = 'Invalid email. Try another email.'
-        message.value = ''
-        return
+        console.warn("Could not send verification email", mailErr);
+        error.value = "Invalid email. Try another email.";
+        message.value = "";
+        return;
       }
     }
-    message.value = 'Account created! Please verify your email before signing in.'
+    message.value =
+      "Account created! Please verify your email before signing in.";
     // Stay on page; let user decide next step after verification.
   } catch (err) {
-    const msg = err?.response?.data?.error || ''
-    if (msg.toLowerCase().includes('invalid email')) {
-      error.value = 'Invalid email. Try another email.'
+    const msg = err?.response?.data?.error || "";
+    if (msg.toLowerCase().includes("invalid email")) {
+      error.value = "Invalid email. Try another email.";
     } else {
-      error.value = msg || 'Could not create your account. Please try again.'
+      error.value = msg || "Could not create your account. Please try again.";
     }
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 </script>
 
 <template>
@@ -72,17 +66,29 @@ const handleSubmit = async () => {
     <div class="auth-card">
       <p class="eyebrow">Le'Blanc</p>
       <h1>Create your account</h1>
-      <p class="lede">Join the ritual—save your preferences, bookings, and recommendations.</p>
+      <p class="lede">
+        Join the ritual—save your preferences, bookings, and recommendations.
+      </p>
 
       <form class="auth-form" @submit.prevent="handleSubmit">
         <label class="field">
           <span>Name</span>
-          <input v-model="form.name" type="text" placeholder="E.g. Jackie Nguyen" autocomplete="name" />
+          <input
+            v-model="form.name"
+            type="text"
+            placeholder="E.g. Jackie Nguyen"
+            autocomplete="name"
+          />
         </label>
 
         <label class="field">
           <span>Email</span>
-          <input v-model="form.email" type="email" placeholder="name@gmail.com" autocomplete="email" />
+          <input
+            v-model="form.email"
+            type="email"
+            placeholder="name@gmail.com"
+            autocomplete="email"
+          />
         </label>
 
         <label class="field">
@@ -100,7 +106,9 @@ const handleSubmit = async () => {
             <span v-if="loading">Creating...</span>
             <span v-else>Create account</span>
           </button>
-          <RouterLink to="/login" class="btn-link">Already have an account? Sign in</RouterLink>
+          <RouterLink to="/login" class="btn-link"
+            >Already have an account? Sign in</RouterLink
+          >
         </div>
       </form>
 
@@ -126,8 +134,9 @@ const handleSubmit = async () => {
 }
 
 .auth-visual {
-  background: linear-gradient(200deg, rgba(15, 20, 36, 0.66), rgba(0, 0, 0, 0.28)),
-    url('https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1400&q=80')
+  background:
+    linear-gradient(200deg, rgba(15, 20, 36, 0.66), rgba(0, 0, 0, 0.28)),
+    url("https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1400&q=80")
       center/cover no-repeat;
 }
 
@@ -135,7 +144,11 @@ const handleSubmit = async () => {
   padding: clamp(24px, 5vw, 48px);
   display: grid;
   gap: 16px;
-  background: linear-gradient(145deg, rgba(246, 239, 230, 0.06), rgba(246, 239, 230, 0.12));
+  background: linear-gradient(
+    145deg,
+    rgba(246, 239, 230, 0.06),
+    rgba(246, 239, 230, 0.12)
+  );
   backdrop-filter: blur(6px);
 }
 
@@ -144,7 +157,7 @@ const handleSubmit = async () => {
   letter-spacing: 0.24em;
   text-transform: uppercase;
   font-size: 0.78rem;
-  font-family: 'Georgia', 'Times New Roman', serif;
+  font-family: "Georgia", "Times New Roman", serif;
   color: #e9d7b6;
 }
 
@@ -207,7 +220,10 @@ h1 {
   font-weight: 800;
   letter-spacing: 0.02em;
   cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
 }
 
 .btn-primary:hover {

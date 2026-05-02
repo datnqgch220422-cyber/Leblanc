@@ -66,20 +66,6 @@ func executeQuery(ctx context.Context, resolver *Resolver, query string, variabl
 			}
 			return map[string]interface{}{"drinks": drinks}, nil
 		}
-		if contains(query, "users") {
-			users, err := resolver.Users(ctx)
-			if err != nil {
-				return nil, err
-			}
-			return map[string]interface{}{"users": users}, nil
-		}
-		if contains(query, "bookings") {
-			bookings, err := resolver.Bookings(ctx)
-			if err != nil {
-				return nil, err
-			}
-			return map[string]interface{}{"bookings": bookings}, nil
-		}
 	}
 
 	if contains(query, "mutation") {
@@ -93,30 +79,6 @@ func executeQuery(ctx context.Context, resolver *Resolver, query string, variabl
 					return nil, err
 				}
 				return map[string]interface{}{"createBooking": booking}, nil
-			}
-		}
-		if contains(query, "register") {
-			var input RegisterInput
-			if inputData, ok := variables["input"].(map[string]interface{}); ok {
-				jsonData, _ := json.Marshal(inputData)
-				_ = json.Unmarshal(jsonData, &input)
-				authResp, err := resolver.Register(ctx, input)
-				if err != nil {
-					return nil, err
-				}
-				return map[string]interface{}{"register": authResp}, nil
-			}
-		}
-		if contains(query, "login") {
-			var input LoginInput
-			if inputData, ok := variables["input"].(map[string]interface{}); ok {
-				jsonData, _ := json.Marshal(inputData)
-				_ = json.Unmarshal(jsonData, &input)
-				authResp, err := resolver.Login(ctx, input)
-				if err != nil {
-					return nil, err
-				}
-				return map[string]interface{}{"login": authResp}, nil
 			}
 		}
 		if contains(query, "recommendFromFeatures") {
@@ -154,7 +116,7 @@ func executeQuery(ctx context.Context, resolver *Resolver, query string, variabl
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
 		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
-		findInString(s, substr)))
+			findInString(s, substr)))
 }
 
 func findInString(s, substr string) bool {

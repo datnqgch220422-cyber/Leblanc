@@ -1,123 +1,86 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
-import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
-import darkLogo from '@/assets/dark-logo.png'
-import brightLogo from '@/assets/bright-logo.png'
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
+import {
+  ADMIN_HOME_PATH,
+  clearSessionUser,
+  getSession,
+  getSessionUser,
+  isAdminUser,
+} from "@/composables/useSessionAuth";
+import { provideThemeState } from "@/composables/useThemeState";
+import { USER_STORAGE_KEY } from "@/services/session.service";
+import darkLogo from "@/assets/dark-logo.png";
+import brightLogo from "@/assets/bright-logo.png";
 
-const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL || '').toLowerCase()
+const { theme, toggleTheme } = provideThemeState();
+const router = useRouter();
+const route = useRoute();
+const session = ref(getSession());
+const user = ref(getSessionUser());
+const isAuthed = computed(() => !!user.value);
+const isAdmin = computed(() => isAdminUser(user.value));
+const isAdminOnlyShell = computed(
+  () => isAdmin.value && route.path.startsWith("/admin"),
+);
+const isPlainLayout = computed(() => route.meta?.layout === "plain");
+const brandTarget = computed(() =>
+  isAdminOnlyShell.value ? ADMIN_HOME_PATH : "/",
+);
 
-const getInitialTheme = () => {
-  try {
-    const stored = localStorage.getItem('theme')
-    return stored === 'night' || stored === 'day' ? stored : 'day'
-  } catch (err) {
-    console.warn('Could not read stored theme', err)
-    return 'day'
-  }
-}
-
-const theme = ref(getInitialTheme())
-provide('theme', theme)
-const router = useRouter()
-const route = useRoute()
-
-const clearPersistedUser = () => {
-  try {
-    localStorage.removeItem('leblancUser')
-  } catch (err) {
-    console.warn('Could not clear stored user', err)
-  }
-}
-
-const loadUser = () => {
-  try {
-    return JSON.parse(localStorage.getItem('leblancUser') || 'null')
-  } catch (err) {
-    console.warn('Could not parse stored user', err)
-    return null
-  }
-}
-
-clearPersistedUser()
-const user = ref(loadUser())
-const isAuthed = computed(() => !!user.value)
-const isAdmin = computed(() => {
-  const email = user.value?.email?.toLowerCase() || ''
-  return ADMIN_EMAIL && email === ADMIN_EMAIL
-})
-const isAdminOnlyShell = computed(() => isAdmin.value && (route.name === 'admin' || route.name === 'account'))
-const isPlainLayout = computed(() => route.meta?.layout === 'plain')
-const brandTarget = computed(() => (isAdminOnlyShell.value ? '/admin' : '/'))
-
-const showAccountMenu = ref(false)
-const accountRef = ref(null)
+const showAccountMenu = ref(false);
+const accountRef = ref(null);
 
 const handleUserUpdated = (event) => {
-  // Event detail can carry the user; fallback to storage for safety.
-  user.value = event?.detail ?? loadUser()
-  showAccountMenu.value = false
-}
+  session.value = event?.detail ?? getSession();
+  user.value = session.value?.user ?? getSessionUser();
+  showAccountMenu.value = false;
+};
 
 const handleStorage = (event) => {
-  if (event.key === 'leblancUser') {
-    user.value = loadUser()
-    showAccountMenu.value = false
+  if (event.key === USER_STORAGE_KEY) {
+    session.value = getSession();
+    user.value = getSessionUser();
+    showAccountMenu.value = false;
   }
-}
+};
 
 onMounted(() => {
-  window.addEventListener('leblanc-user-updated', handleUserUpdated)
-  window.addEventListener('storage', handleStorage)
-  document.addEventListener('click', handleClickOutside)
-})
+  window.addEventListener("leblanc-user-updated", handleUserUpdated);
+  window.addEventListener("storage", handleStorage);
+  document.addEventListener("click", handleClickOutside);
+});
 
 onBeforeUnmount(() => {
-  window.removeEventListener('leblanc-user-updated', handleUserUpdated)
-  window.removeEventListener('storage', handleStorage)
-  document.removeEventListener('click', handleClickOutside)
-})
+  window.removeEventListener("leblanc-user-updated", handleUserUpdated);
+  window.removeEventListener("storage", handleStorage);
+  document.removeEventListener("click", handleClickOutside);
+});
 
-const applyTheme = (value) => {
-  if (typeof document === 'undefined') return
-  const themeValue = value === 'night' ? 'night' : 'day'
-  const body = document.body
-  body.classList.remove('theme-day', 'theme-night')
-  body.classList.add(themeValue === 'night' ? 'theme-night' : 'theme-day')
-  document.documentElement.setAttribute('data-theme', themeValue)
-  try {
-    localStorage.setItem('theme', themeValue)
-  } catch (err) {
-    console.warn('Could not persist theme', err)
-  }
-}
+const logoSrc = computed(() =>
+  theme.value === "night" ? brightLogo : darkLogo,
+);
 
-watch(theme, (val) => applyTheme(val), { immediate: true })
-
-const toggleTheme = () => {
-  theme.value = theme.value === 'night' ? 'day' : 'night'
-}
-
-const logoSrc = computed(() => (theme.value === 'night' ? brightLogo : darkLogo))
-
-const userInitial = computed(() => (user.value?.name?.[0] || 'A').toUpperCase())
+const userInitial = computed(() =>
+  (user.value?.name?.[0] || "A").toUpperCase(),
+);
 
 const logout = () => {
-  localStorage.removeItem('leblancUser')
-  user.value = null
-  window.dispatchEvent(new CustomEvent('leblanc-user-updated', { detail: null }))
-  router.push('/')
-}
+  clearSessionUser();
+  user.value = null;
+  router.push("/");
+};
 
 const toggleAccountMenu = () => {
-  showAccountMenu.value = !showAccountMenu.value
-}
+  showAccountMenu.value = !showAccountMenu.value;
+};
 
 const handleClickOutside = (event) => {
-  if (!accountRef.value) return
+  if (!accountRef.value) return;
   if (!accountRef.value.contains(event.target)) {
-    showAccountMenu.value = false
+    showAccountMenu.value = false;
   }
-}
+};
 </script>
 
 <template>
@@ -129,15 +92,41 @@ const handleClickOutside = (event) => {
       </RouterLink>
       <nav class="nav">
         <template v-if="isAdminOnlyShell">
-          <RouterLink to="/admin" class="nav-link" exact-active-class="active">Admin</RouterLink>
+          <RouterLink to="/admin" class="nav-link" exact-active-class="active"
+            >Admin</RouterLink
+          >
         </template>
         <template v-else>
-          <RouterLink to="/about" class="nav-link" exact-active-class="active">About</RouterLink>
-          <RouterLink to="/menu" class="nav-link" exact-active-class="active">Menu</RouterLink>
-          <RouterLink to="/booking" class="nav-link" exact-active-class="active">Booking</RouterLink>
-          <RouterLink v-if="isAdmin" to="/admin" class="nav-link" exact-active-class="active">Admin</RouterLink>
-          <RouterLink v-if="!isAuthed" to="/login" class="nav-link" exact-active-class="active">Login</RouterLink>
-          <RouterLink v-if="!isAuthed" to="/register" class="nav-link" exact-active-class="active">Sign up</RouterLink>
+          <RouterLink to="/about" class="nav-link" exact-active-class="active"
+            >About</RouterLink
+          >
+          <RouterLink to="/menu" class="nav-link" exact-active-class="active"
+            >Menu</RouterLink
+          >
+          <RouterLink to="/booking" class="nav-link" exact-active-class="active"
+            >Booking</RouterLink
+          >
+          <RouterLink
+            v-if="isAdmin"
+            :to="ADMIN_HOME_PATH"
+            class="nav-link"
+            exact-active-class="active"
+            >Admin</RouterLink
+          >
+          <RouterLink
+            v-if="!isAuthed"
+            to="/login"
+            class="nav-link"
+            exact-active-class="active"
+            >Login</RouterLink
+          >
+          <RouterLink
+            v-if="!isAuthed"
+            to="/register"
+            class="nav-link"
+            exact-active-class="active"
+            >Sign up</RouterLink
+          >
         </template>
         <div v-if="isAuthed" ref="accountRef" class="account-wrap">
           <button
@@ -155,24 +144,33 @@ const handleClickOutside = (event) => {
             </div>
             <RouterLink
               v-if="isAdmin"
-              to="/admin"
+              :to="ADMIN_HOME_PATH"
               class="account-link"
               exact-active-class="active"
               @click="showAccountMenu = false"
             >
               Admin dashboard
             </RouterLink>
-            <RouterLink to="/account" class="account-link" exact-active-class="active" @click="showAccountMenu = false">
+            <RouterLink
+              to="/account"
+              class="account-link"
+              exact-active-class="active"
+              @click="showAccountMenu = false"
+            >
               Account
             </RouterLink>
-            <button class="logout" type="button" @click="logout">Log out</button>
+            <button class="logout" type="button" @click="logout">
+              Log out
+            </button>
           </div>
         </div>
         <button
           class="theme-toggle"
           :class="{ 'is-night': theme === 'night' }"
           type="button"
-          :aria-label="theme === 'night' ? 'Switch to day mode' : 'Switch to night mode'"
+          :aria-label="
+            theme === 'night' ? 'Switch to day mode' : 'Switch to night mode'
+          "
           @click="toggleTheme"
         >
           <span class="toggle-track" :class="{ 'is-night': theme === 'night' }">
@@ -363,7 +361,9 @@ const handleClickOutside = (event) => {
   align-items: center;
   padding: 2px;
   box-sizing: border-box;
-  transition: background 0.18s ease, border-color 0.18s ease;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease;
 }
 
 .toggle-track.is-night {
