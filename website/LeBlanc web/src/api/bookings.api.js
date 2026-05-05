@@ -24,11 +24,25 @@ const mapBookingToGraphQLInput = (booking, normalizedTime) => ({
 export const getBookingsREST = () =>
   apiClient.get("/bookings").then((res) => res.data);
 
+export const getBookingsByEmailREST = (email) =>
+  apiClient.get("/bookings", { params: { email } }).then((res) => res.data);
+
+export const getBookingPaymentStatusREST = (paymentOrderId) =>
+  apiClient
+    .get("/bookings/payment-status", { params: { paymentOrderId } })
+    .then((res) => res.data);
+
 export const createBookingREST = (booking) =>
   apiClient.post("/bookings", booking).then((res) => res.data);
 
 export const getBookings = () =>
   USE_GRAPHQL ? getBookingsGraphQL() : getBookingsREST();
+
+export const getBookingsByEmail = (email) =>
+  USE_GRAPHQL ? getBookingsGraphQL() : getBookingsByEmailREST(email);
+
+export const getBookingPaymentStatus = (paymentOrderId) =>
+  getBookingPaymentStatusREST(paymentOrderId);
 
 export const createBooking = (booking) => {
   const normalizedTime = normalizeTime(booking.time);

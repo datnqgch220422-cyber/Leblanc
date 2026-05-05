@@ -24,6 +24,40 @@ const router = createRouter({
       component: () => import("@/views/Menu.vue"),
     },
     {
+      path: "/booking/addons",
+      name: "booking-addons",
+      component: () => import("@/views/BookingAddons.vue"),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: "/cart",
+      redirect: { path: "/booking/addons" },
+    },
+    {
+      path: "/orders",
+      name: "orders",
+      component: () => import("@/views/MyOrders.vue"),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: "/orders/:id",
+      name: "order-detail",
+      component: () => import("@/views/BookingDetail.vue"),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: "/booking/confirmation",
+      name: "booking-confirmation",
+      component: () => import("@/views/BookingConfirmation.vue"),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: "/booking/payment-result",
+      name: "booking-payment-result",
+      component: () => import("@/views/PaymentResult.vue"),
+      meta: { requiresAuth: true },
+    },
+    {
       path: "/booking",
       name: "booking",
       component: () => import("@/views/Booking.vue"),
@@ -54,27 +88,20 @@ const router = createRouter({
     },
     {
       path: "/admin",
-      component: () => import("@/components/admin/AdminLayout.vue"),
+      component: () => import("@/views/Admin.vue"),
       meta: { requiresAdmin: true },
       children: [
         {
-          path: "",
-          redirect: { name: "admin-users" },
-        },
-        {
           path: "users",
-          name: "admin-users",
-          component: () => import("@/views/admin/AdminUsers.vue"),
+          redirect: { path: "/admin" },
         },
         {
           path: "bookings",
-          name: "admin-bookings",
-          component: () => import("@/views/admin/AdminBookings.vue"),
+          redirect: { path: "/admin" },
         },
         {
           path: "drinks",
-          name: "admin-drinks",
-          component: () => import("@/views/admin/AdminDrinks.vue"),
+          redirect: { path: "/admin" },
         },
       ],
     },

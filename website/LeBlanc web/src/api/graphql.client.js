@@ -80,6 +80,7 @@ export const GET_BOOKINGS_QUERY = gql`
         qty
         options
       }
+      status
       channel
     }
   }
@@ -99,6 +100,7 @@ export const CREATE_BOOKING_MUTATION = gql`
         qty
         options
       }
+      status
       channel
     }
   }

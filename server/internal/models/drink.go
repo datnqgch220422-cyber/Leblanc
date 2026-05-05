@@ -14,6 +14,8 @@ type Drink struct {
 	ID         primitive.ObjectID `bson:"_id,omitempty" json:"_id"`
 	Name       string             `bson:"name" json:"name"`
 	Price      int                `bson:"price" json:"price"`
+	Stock      int                `bson:"stock" json:"stock"`
+	Available  bool               `bson:"available" json:"available"`
 	Tags       []string           `bson:"tags" json:"tags"`
 	Caffeine   string             `bson:"caffeine" json:"caffeine"` // low|med|high
 	Temp       string             `bson:"temp" json:"temp"`         // hot|iced|either

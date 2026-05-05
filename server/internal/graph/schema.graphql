@@ -10,6 +10,8 @@ type Drink {
   _id: ID!
   name: String!
   price: Int!
+  stock: Int!
+  available: Boolean!
   tags: [String!]!
   caffeine: String!
   temp: String!
@@ -41,6 +43,7 @@ type Booking {
   time: String!
   guests: Int
   items: [BookingItem!]!
+  status: String!
   channel: String!
 }
 

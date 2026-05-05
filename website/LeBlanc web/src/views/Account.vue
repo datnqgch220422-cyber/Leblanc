@@ -39,6 +39,25 @@ const logout = () => {
     <div class="card empty" v-else>
       <p>You are not signed in. Redirecting to login...</p>
     </div>
+
+    <div class="history card-block" v-if="user">
+      <div class="history__header">
+        <div>
+          <p class="eyebrow">Le'Blanc</p>
+          <h2>Booking Hub</h2>
+        </div>
+        <div class="actions">
+          <RouterLink to="/booking/addons" class="btn btn-link"
+            >Đồ uống kèm bàn</RouterLink
+          >
+          <RouterLink to="/orders" class="btn btn-link">My Orders</RouterLink>
+        </div>
+      </div>
+      <p class="muted">
+        Chọn đồ uống đi kèm lịch đặt bàn ở mục "Đồ uống kèm bàn", sau đó theo
+        dõi trạng thái tại "My Orders".
+      </p>
+    </div>
   </section>
 </template>
 
@@ -126,6 +145,70 @@ h1 {
 .actions {
   display: flex;
   gap: 10px;
+}
+
+.btn-link {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-block {
+  display: grid;
+  gap: 14px;
+  padding: 18px 20px;
+  border-radius: 14px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.9),
+    rgba(246, 239, 230, 0.8)
+  );
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.08);
+}
+
+.history__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.history-list {
+  display: grid;
+  gap: 12px;
+}
+
+.history-item {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.empty-state,
+.muted,
+.error {
+  margin: 0;
+}
+
+.muted {
+  color: rgba(0, 0, 0, 0.68);
+}
+
+.status {
+  margin: 0;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #7d4c12;
+}
+
+.error {
+  color: #9d3412;
 }
 
 .btn {

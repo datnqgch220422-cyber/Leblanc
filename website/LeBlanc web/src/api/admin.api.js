@@ -1,9 +1,16 @@
 import apiClient from "./httpClient";
+import { ADMIN_LIST_TIMEOUT_MS } from "@/config/adminConfig";
+
+const withQuery = (params = {}) => ({
+  params,
+});
 
 const unwrapAdminData = (res) => res.data?.data;
 
 export const getAdminUsers = () =>
-  apiClient.get("/admin/users").then(unwrapAdminData);
+  apiClient
+    .get("/admin/users", { timeout: ADMIN_LIST_TIMEOUT_MS })
+    .then(unwrapAdminData);
 
 export const createAdminUser = (payload) =>
   apiClient.post("/admin/users", payload).then(unwrapAdminData);
@@ -15,7 +22,9 @@ export const deleteAdminUser = (id) =>
   apiClient.delete(`/admin/users/${id}`).then((res) => res.data);
 
 export const getAdminBookings = () =>
-  apiClient.get("/admin/bookings").then(unwrapAdminData);
+  apiClient
+    .get("/admin/bookings", { timeout: ADMIN_LIST_TIMEOUT_MS })
+    .then(unwrapAdminData);
 
 export const createAdminBooking = (payload) =>
   apiClient.post("/admin/bookings", payload).then(unwrapAdminData);
@@ -27,7 +36,20 @@ export const deleteAdminBooking = (id) =>
   apiClient.delete(`/admin/bookings/${id}`).then((res) => res.data);
 
 export const getAdminDrinks = () =>
-  apiClient.get("/admin/drinks").then(unwrapAdminData);
+  apiClient
+    .get("/admin/drinks", {
+      ...withQuery(),
+      timeout: ADMIN_LIST_TIMEOUT_MS,
+    })
+    .then(unwrapAdminData);
+
+export const getAdminDrinksWithFilters = (params = {}) =>
+  apiClient
+    .get("/admin/drinks", {
+      ...withQuery(params),
+      timeout: ADMIN_LIST_TIMEOUT_MS,
+    })
+    .then(unwrapAdminData);
 
 export const createAdminDrink = (payload) =>
   apiClient.post("/admin/drinks", payload).then(unwrapAdminData);

@@ -18,8 +18,6 @@ const {
   bookingLoading,
   bookingOk,
   bookingError,
-  bookingEmailSent,
-  bookingEmailError,
   recoLoading,
   recoError,
   canSubmit,
@@ -92,13 +90,7 @@ const {
           <span v-else>Book table{{ totalItems ? " & drinks" : "" }}</span>
         </button>
         <p v-if="bookingOk" class="status success">
-          Đặt bàn thành công! Chúng tôi sẽ liên hệ xác nhận.
-        </p>
-        <p v-if="bookingOk && bookingEmailSent" class="status success">
-          Email xác nhận đã gửi tới: {{ form.email }}
-        </p>
-        <p v-if="bookingOk && bookingEmailError" class="status error">
-          Đặt bàn thành công nhưng gửi email thất bại: {{ bookingEmailError }}
+          Đặt bàn đã được tạo. Đang chuyển sang thanh toán VNPay...
         </p>
         <p v-if="bookingError && !bookingOk" class="status error">
           {{ bookingError }}
@@ -107,121 +99,49 @@ const {
     </div>
 
     <div class="panel reco">
-      <div class="reco-head">
-        <div>
-          <p class="eyebrow">Mood-booker</p>
-          <h2>Gợi ý đồ uống</h2>
-        </div>
-        <button
-          class="ghost"
-          type="button"
-          :disabled="recoLoading"
-          @click="fetchReco"
-        >
-          {{ recoLoading ? "Đang gợi ý..." : "Làm mới gợi ý" }}
-        </button>
+      <div>
+        <p class="eyebrow">My Booking</p>
+        <h2>Added drinks</h2>
       </div>
 
-      <div class="controls">
-        <label>
-          Mood
-          <select v-model="mood">
-            <option value="happy">Happy</option>
-            <option value="calm">Calm</option>
-            <option value="stressed">Stressed</option>
-            <option value="sad">Sad</option>
-            <option value="adventurous">Adventurous</option>
-          </select>
-        </label>
-        <template v-if="!isNight">
-          <label>
-            Caffeine
-            <select v-model="caffeinePref">
-              <option value="">Any</option>
-              <option value="high">High</option>
-              <option value="med">Medium</option>
-              <option value="low">Low</option>
-              <option value="none">None</option>
-            </select>
-          </label>
-          <label>
-            Temperature
-            <select v-model="tempPref">
-              <option value="">Any</option>
-              <option value="hot">Hot</option>
-              <option value="iced">Iced</option>
-              <option value="cold">Cold</option>
-            </select>
-          </label>
-          <label>
-            Sweetness: {{ sweetness }}
-            <input v-model.number="sweetness" type="range" min="1" max="10" />
-          </label>
-        </template>
-        <template v-else>
-          <label>
-            Drink type
-            <select v-model="nightType">
-              <option value="">Any</option>
-              <option value="cocktail">Cocktail</option>
-              <option value="wine">Wine</option>
-              <option value="beer">Beer</option>
-              <option value="liqueur">Liqueur</option>
-              <option value="coffee">Coffee</option>
-            </select>
-          </label>
-          <label>
-            Base
-            <select v-model="nightBase">
-              <option value="">Any</option>
-              <option value="gin">Gin</option>
-              <option value="rum">Rum</option>
-              <option value="whisky">Whisky</option>
-              <option value="wine">Wine</option>
-              <option value="beer">Beer</option>
-              <option value="liqueur">Liqueur</option>
-              <option value="coffee">Coffee</option>
-              <option value="signature">Signature</option>
-            </select>
-          </label>
-        </template>
-      </div>
-
-      <p v-if="recoError" class="status error">{{ recoError }}</p>
-      <div v-else class="reco-list">
-        <div v-if="recoLoading" class="status">Đang gợi ý...</div>
-        <template v-else>
-          <div
-            v-for="drink in reco"
-            :key="drink.drinkId || drink._id"
-            class="card"
-          >
-            <div class="card-head">
-              <div>
-                <p class="name">{{ drink.name || "Drink" }}</p>
-                <p class="meta">
-                  {{
-                    drink.price
-                      ? drink.price.toLocaleString("vi-VN") + " VND"
-                      : "—"
-                  }}
-                  <span v-if="drink.score !== undefined" class="score"
-                    >Score: {{ drink.score?.toFixed(2) }}</span
-                  >
-                </p>
+      <div v-if="selectedItems.length" class="selected-list">
+        <p class="mini-title">Added {{ totalItems }} drinks</p>
+        <div class="chip-list">
+          <div v-for="item in selectedItems" :key="item.drinkId" class="chip">
+            <div>
+              <div class="name">{{ item.drink?.name || "Drink" }}</div>
+              <div class="meta">
+                {{
+                  item.drink?.price
+                    ? item.drink.price.toLocaleString("vi-VN") + " VND"
+                    : "—"
+                }}
               </div>
-              <button type="button" class="mini" @click="addDrink(drink)">
-                Add
+            </div>
+
+            <div class="qty">
+              <button type="button" @click="updateQty(item.drinkId, -1)">
+                -
+              </button>
+              <span>{{ item.qty }}</span>
+              <button type="button" @click="updateQty(item.drinkId, 1)">
+                +
+              </button>
+              <button
+                type="button"
+                class="mini"
+                @click="updateQty(item.drinkId, -item.qty)"
+              >
+                Xóa
               </button>
             </div>
-            <p class="desc">
-              {{ drink.desc || "Hãy thử ngay thức uống hợp mood của bạn." }}
-            </p>
           </div>
-          <p v-if="!reco.length && !recoLoading" class="status">
-            Chưa có gợi ý. Hãy thử mood khác.
-          </p>
-        </template>
+        </div>
+      </div>
+
+      <div v-else class="status">
+        No drinks added yet. <br />
+        You can add some from the menu before booking.
       </div>
     </div>
   </section>
@@ -243,6 +163,14 @@ const {
   gap: 14px;
   border: 1px solid rgba(0, 0, 0, 0.06);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.12);
+  align-content: start;
+}
+
+.selected-list {
+  display: grid;
+  gap: 12px;
+  overflow-y: auto;
+  max-height: 60vh;
 }
 
 .form-fields {
@@ -314,6 +242,8 @@ button:disabled {
 .chip-list {
   display: grid;
   gap: 8px;
+  max-height: 50vh;
+  overflow-y: auto;
 }
 
 .chip {
@@ -437,7 +367,21 @@ button:disabled {
   color: rgba(245, 241, 232, 0.82);
 }
 
+:global(.theme-night) .lede {
+  color: rgba(245, 241, 232, 0.82);
+}
+
 :global(.theme-night) .card .name {
+  color: #f6efe6;
+}
+
+:global(.theme-night) .chip {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f6efe6;
+}
+
+:global(.theme-night) .status {
+  background: rgba(255, 255, 255, 0.08);
   color: #f6efe6;
 }
 
@@ -459,5 +403,25 @@ button:disabled {
 :global(.theme-night) .status.error {
   background: rgba(255, 94, 94, 0.18);
   color: #ffc7c7;
+}
+
+:global(.theme-night) .mini-title {
+  color: #f6efe6;
+}
+
+:global(.theme-night) .chip {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+:global(.theme-night) .chip .name {
+  color: #f6efe6;
+}
+
+:global(.theme-night) .chip .meta {
+  color: rgba(245, 241, 232, 0.82);
+}
+
+:global(.theme-night) .selected-list {
+  color: #f6efe6;
 }
 </style>

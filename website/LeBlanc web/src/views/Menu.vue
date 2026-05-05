@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { getDrinks } from "@/api";
 import { useThemeState } from "@/composables/useThemeState";
+import { useCart } from "@/composables/useCart";
 import americanoCamSa from "@/assets/americano-cam-sa.png";
 import cafeSuaDa from "@/assets/cafe-sua-da.png";
 import cafeDua from "@/assets/cafe-dua.png";
@@ -315,9 +316,9 @@ const placeholders = [
 ];
 
 const { theme } = useThemeState();
-
 const loading = ref(true);
 const error = ref("");
+const toast = ref("");
 const dayDrinks = ref(morningMenu);
 const nightDrinks = ref(nightSpecials);
 
@@ -334,6 +335,18 @@ const normalizeDrink = (drink, fallbackKind = "Coffee") => ({
       ? drink.isAlcoholic
       : fallbackKind !== "Coffee",
 });
+
+const resolveAvailability = (drink) => {
+  if (typeof drink.available === "boolean") {
+    return drink.available;
+  }
+
+  if (typeof drink.stock === "number") {
+    return drink.stock > 0;
+  }
+
+  return null;
+};
 
 const filterByTag = (items, tag) =>
   items.filter((d) =>
@@ -384,6 +397,24 @@ const displayCaffeine = (value) => {
   const normalized = text.replace(/[-—\s()]/g, "").toLowerCase();
   if (!normalized || normalized.includes("teabased")) return "";
   return text;
+};
+
+// booking add-ons helper
+const { add } = useCart();
+const addToBookingAddons = async (drinkId) => {
+  try {
+    await add(drinkId, 1);
+    toast.value = "Đã thêm đồ uống vào danh sách kèm đặt bàn";
+    setTimeout(() => {
+      toast.value = "";
+    }, 1800);
+  } catch (err) {
+    toast.value = "Vui lòng đăng nhập để chọn đồ uống kèm bàn";
+    setTimeout(() => {
+      toast.value = "";
+    }, 1800);
+    console.warn("Add to booking add-ons failed", err);
+  }
 };
 
 onMounted(fetchDrinks);
@@ -445,6 +476,7 @@ onMounted(fetchDrinks);
     <div v-if="loading && menuMode === 'day'" class="state">
       Loading menu...
     </div>
+    <div v-if="toast" class="state toast">{{ toast }}</div>
     <div
       v-else-if="menuMode === 'day' && !currentMenu.length"
       class="state error"
@@ -475,6 +507,18 @@ onMounted(fetchDrinks);
             </div>
             <p class="desc">{{ drink.desc }}</p>
             <div class="meta-row">
+              <span
+                v-if="resolveAvailability(drink) === true"
+                class="chip tone"
+              >
+                In stock
+              </span>
+              <span
+                v-else-if="resolveAvailability(drink) === false"
+                class="chip tone unavailable"
+              >
+                Sold out
+              </span>
               <span v-if="displayCaffeine(drink.caffeine)" class="chip tone">{{
                 displayCaffeine(drink.caffeine)
               }}</span>
@@ -482,6 +526,13 @@ onMounted(fetchDrinks);
               <span v-if="formatSweetness(drink.sweetness)" class="chip tone">{{
                 formatSweetness(drink.sweetness)
               }}</span>
+              <button
+                class="btn"
+                :disabled="resolveAvailability(drink) === false"
+                @click="addToBookingAddons(drink._id)"
+              >
+                Chọn kèm bàn
+              </button>
             </div>
           </div>
         </article>
@@ -745,6 +796,12 @@ onMounted(fetchDrinks);
   border-color: rgba(0, 0, 0, 0.08);
 }
 
+.chip.tone.unavailable {
+  background: rgba(181, 43, 43, 0.08);
+  border-color: rgba(181, 43, 43, 0.2);
+  color: #8d1f1f;
+}
+
 .card.night .chip.tone {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.18);
@@ -762,6 +819,12 @@ onMounted(fetchDrinks);
 .state.error {
   color: var(--orange-strong);
   background: #ffe8dd;
+}
+
+.state.toast {
+  color: #18592a;
+  background: #e9f7ec;
+  border-color: #a8d7b2;
 }
 
 @media (max-width: 900px) {

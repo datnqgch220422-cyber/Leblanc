@@ -38,6 +38,7 @@ type adminBookingPayload struct {
 	Phone   string                    `json:"phone"`
 	Time    string                    `json:"time"`
 	Guests  int                       `json:"guests"`
+	Status  string                    `json:"status"`
 	Items   []adminBookingItemPayload `json:"items"`
 	Channel string                    `json:"channel"`
 }
@@ -45,6 +46,8 @@ type adminBookingPayload struct {
 type adminDrinkPayload struct {
 	Name       string            `json:"name"`
 	Price      int               `json:"price"`
+	Stock      int               `json:"stock"`
+	Available  bool              `json:"available"`
 	Tags       []string          `json:"tags"`
 	Caffeine   string            `json:"caffeine"`
 	Temp       string            `json:"temp"`
@@ -283,6 +286,7 @@ func AdminUpdateBooking(c *gin.Context) {
 		"time":    booking.Time,
 		"guests":  booking.Guests,
 		"items":   booking.Items,
+		"status":  booking.Status,
 		"channel": booking.Channel,
 	}
 
@@ -335,7 +339,11 @@ func AdminListDrinks(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cur, err := db.DB.Collection("drinks").Find(ctx, bson.D{}, optionsFindByNameAsc().toFindOptions())
+	filter, sortOptions := buildDrinkListQuery(c)
+	findOptions := options.Find()
+	findOptions.SetSort(sortOptions)
+
+	cur, err := db.DB.Collection("drinks").Find(ctx, filter, findOptions)
 	if err != nil {
 		respondError(c, http.StatusInternalServerError, err.Error())
 		return
@@ -397,6 +405,8 @@ func AdminUpdateDrink(c *gin.Context) {
 	update := bson.M{
 		"name":       drink.Name,
 		"price":      drink.Price,
+		"stock":      drink.Stock,
+		"available":  drink.Available,
 		"tags":       drink.Tags,
 		"caffeine":   drink.Caffeine,
 		"temp":       drink.Temp,
@@ -484,6 +494,7 @@ func buildBookingFromPayload(payload adminBookingPayload) (models.Booking, error
 		Time:    timeVal,
 		Guests:  payload.Guests,
 		Items:   items,
+		Status:  models.NormalizeBookingStatus(payload.Status),
 		Channel: channel,
 	}, nil
 }
@@ -532,6 +543,8 @@ func buildDrinkFromPayload(payload adminDrinkPayload) (models.Drink, error) {
 	return models.Drink{
 		Name:       payload.Name,
 		Price:      payload.Price,
+		Stock:      payload.Stock,
+		Available:  payload.Available || payload.Stock > 0,
 		Tags:       normalizeTags(payload.Tags),
 		Caffeine:   normalizeOrDefault(payload.Caffeine, "none"),
 		Temp:       normalizeOrDefault(payload.Temp, "iced"),

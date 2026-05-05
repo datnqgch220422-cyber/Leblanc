@@ -1,8 +1,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { createBooking, getDrinks, recoFromFeatures } from "@/api";
-import { isBookingEmailReady, sendBookingEmail } from "@/email";
 import { getSessionUser } from "@/composables/useSessionAuth";
 import { subscribeUserUpdated } from "@/services/session.service";
+import { useBookingAddons } from "@/composables/useBookingAddons";
 
 export const useBookingFlow = (isNightRef) => {
   const form = ref({
@@ -29,8 +29,6 @@ export const useBookingFlow = (isNightRef) => {
   const bookingLoading = ref(false);
   const bookingOk = ref(false);
   const bookingError = ref("");
-  const bookingEmailSent = ref(false);
-  const bookingEmailError = ref("");
 
   const recoLoading = ref(false);
   const recoError = ref("");
@@ -44,7 +42,6 @@ export const useBookingFlow = (isNightRef) => {
       formClock.value &&
       form.value.time,
   );
-  const bookingEmailReady = computed(() => isBookingEmailReady());
 
   const isNightMode = () => Boolean(isNightRef?.value);
 
@@ -179,6 +176,68 @@ export const useBookingFlow = (isNightRef) => {
     };
   };
 
+  // booking addons sync: initialize and propagate to server-side booking addons when user is signed in
+  const {
+    bookingAddons,
+    load: loadAddons,
+    add: addAddon,
+    update: updateAddon,
+    remove: removeAddon,
+  } = useBookingAddons();
+
+  const syncSelectionFromAddons = () => {
+    try {
+      const items = Array.isArray(bookingAddons.value?.items)
+        ? bookingAddons.value.items
+        : [];
+      const map = {};
+      for (const it of items) {
+        const id = it.drinkId;
+        const qty = Number(it.qty) || 0;
+        if (!id || qty <= 0) continue;
+        map[id] = { drink: resolveDrink(id) || {}, qty };
+      }
+      if (Object.keys(map).length) selection.value = map;
+    } catch (err) {
+      // ignore
+    }
+  };
+
+  // watch selection and push diffs to bookingAddons for logged-in user
+  watch(
+    selection,
+    async (val, oldVal) => {
+      try {
+        const user = getSessionUser();
+        const email = user?.email;
+        if (!email) return;
+
+        const newIds = Object.keys(val || {});
+        const oldIds = Object.keys(oldVal || {});
+
+        for (const id of newIds) {
+          const newQty = Number(val[id]?.qty || 0);
+          const oldQty = Number(oldVal?.[id]?.qty || 0);
+          if (newQty <= 0) continue;
+          if (!oldIds.includes(id)) {
+            await addAddon(id, newQty, email);
+          } else if (newQty !== oldQty) {
+            await updateAddon(id, newQty, email);
+          }
+        }
+
+        for (const id of oldIds) {
+          if (!newIds.includes(id)) {
+            await removeAddon(id, email);
+          }
+        }
+      } catch (err) {
+        // non-fatal
+      }
+    },
+    { deep: true },
+  );
+
   const selectedItems = computed(() =>
     Object.entries(selection.value).map(([drinkId, entry]) => ({
       drinkId,
@@ -196,8 +255,6 @@ export const useBookingFlow = (isNightRef) => {
     bookingLoading.value = true;
     bookingError.value = "";
     bookingOk.value = false;
-    bookingEmailSent.value = false;
-    bookingEmailError.value = "";
     try {
       const items = selectedItems.value.map((item) => ({
         drinkId: item.drinkId,
@@ -208,31 +265,19 @@ export const useBookingFlow = (isNightRef) => {
         ...form.value,
         items,
         channel: "web",
+        paymentMethod: "vnpay",
       };
       const res = await createBooking(payload);
+      const payUrl = String(res?.payUrl || "").trim();
+      if (payUrl) {
+        bookingOk.value = true;
+        selection.value = {};
+        window.location.href = payUrl;
+        return;
+      }
+
       bookingOk.value = Boolean(res?.ok || res?._id);
       if (bookingOk.value) {
-        if (form.value.email && bookingEmailReady.value) {
-          const emailItems = selectedItems.value.map((item) => ({
-            drinkId: item.drinkId,
-            name: item.drink?.name || "Drink",
-            qty: item.qty,
-          }));
-          const bookingForEmail = {
-            ...payload,
-            items: emailItems,
-            bookingId: res?.id || res?._id || "",
-          };
-          sendBookingEmail(bookingForEmail)
-            .then(() => {
-              bookingEmailSent.value = true;
-            })
-            .catch((err) => {
-              bookingEmailError.value =
-                err?.message || "Gửi email xác nhận thất bại.";
-              console.warn("Booking email failed", err);
-            });
-        }
         selection.value = {};
       }
     } catch (err) {
@@ -258,6 +303,15 @@ export const useBookingFlow = (isNightRef) => {
     fetchDrinks();
     fetchReco();
     applyUser(getSessionUser());
+
+    // load booking addons for current user and sync selection
+    try {
+      loadAddons();
+      watch(bookingAddons, syncSelectionFromAddons);
+    } catch (err) {
+      // ignore
+    }
+
     unsubscribeUserUpdated = subscribeUserUpdated((event) => {
       applyUser(event?.detail);
     });
@@ -283,12 +337,9 @@ export const useBookingFlow = (isNightRef) => {
     bookingLoading,
     bookingOk,
     bookingError,
-    bookingEmailSent,
-    bookingEmailError,
     recoLoading,
     recoError,
     canSubmit,
-    bookingEmailReady,
     fetchReco,
     addDrink,
     updateQty,

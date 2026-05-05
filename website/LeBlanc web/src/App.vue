@@ -159,6 +159,22 @@ const handleClickOutside = (event) => {
             >
               Account
             </RouterLink>
+            <RouterLink
+              to="/booking/addons"
+              class="account-link"
+              exact-active-class="active"
+              @click="showAccountMenu = false"
+            >
+              Đồ uống kèm bàn
+            </RouterLink>
+            <RouterLink
+              to="/orders"
+              class="account-link"
+              exact-active-class="active"
+              @click="showAccountMenu = false"
+            >
+              My Orders
+            </RouterLink>
             <button class="logout" type="button" @click="logout">
               Log out
             </button>
