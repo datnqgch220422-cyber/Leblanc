@@ -238,20 +238,12 @@ func (r *Resolver) Login(ctx context.Context, input LoginInput) (*AuthResponse, 
 	return &AuthResponse{Ok: true, User: &user}, nil
 }
 
-type EmotionFitInput struct {
-	Calm        float64 `json:"calm"`
-	Happy       float64 `json:"happy"`
-	Stressed    float64 `json:"stressed"`
-	Sad         float64 `json:"sad"`
-	Adventurous float64 `json:"adventurous"`
-}
-
 type RecommendationScore struct {
 	DrinkID string  `json:"drinkId"`
 	Score   float64 `json:"score"`
 }
 
-func (r *Resolver) RecommendFromFeatures(ctx context.Context, emotionFit EmotionFitInput, caffeine *string, temp *string, sweetness *int) ([]*RecommendationScore, error) {
+func (r *Resolver) RecommendFromFeatures(ctx context.Context, caffeine *string, temp *string, sweetness *int) ([]*RecommendationScore, error) {
 	// Get all drinks
 	cur, err := db.DB.Collection("drinks").Find(ctx, bson.D{})
 	if err != nil {
@@ -262,15 +254,6 @@ func (r *Resolver) RecommendFromFeatures(ctx context.Context, emotionFit Emotion
 	var drinks []models.Drink
 	if err := cur.All(ctx, &drinks); err != nil {
 		return nil, err
-	}
-
-	// Convert input to models.EmotionFit
-	emotionFitModel := models.EmotionFit{
-		Calm:        emotionFit.Calm,
-		Happy:       emotionFit.Happy,
-		Stressed:    emotionFit.Stressed,
-		Sad:         emotionFit.Sad,
-		Adventurous: emotionFit.Adventurous,
 	}
 
 	var caffeineVal, tempVal string
@@ -287,7 +270,7 @@ func (r *Resolver) RecommendFromFeatures(ctx context.Context, emotionFit Emotion
 	}
 
 	// Score each drink
-	scores := services.ScoreDrinks(drinks, emotionFitModel, caffeineVal, tempVal, sweetnessVal)
+	scores := services.ScoreDrinks(drinks, caffeineVal, tempVal, sweetnessVal)
 
 	// Convert to response format
 	result := make([]*RecommendationScore, len(scores))

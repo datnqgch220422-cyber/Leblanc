@@ -1,5 +1,12 @@
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { createBooking, getDrinks, recoFromFeatures } from "@/api";
+import {
+  computed,
+  onBeforeUnmount,
+  onMounted,
+  nextTick,
+  ref,
+  watch,
+} from "vue";
+import { createBooking, getDrinks } from "@/api";
 import { getSessionUser } from "@/composables/useSessionAuth";
 import { subscribeUserUpdated } from "@/services/session.service";
 import { useBookingAddons } from "@/composables/useBookingAddons";
@@ -10,12 +17,11 @@ export const useBookingFlow = (isNightRef) => {
     phone: "",
     email: "",
     time: "",
-    guests: 2,
+    guests: 1,
   });
   const formDate = ref("");
   const formClock = ref("");
 
-  const mood = ref("happy");
   const caffeinePref = ref("");
   const tempPref = ref("");
   const sweetness = ref(5);
@@ -29,6 +35,7 @@ export const useBookingFlow = (isNightRef) => {
   const bookingLoading = ref(false);
   const bookingOk = ref(false);
   const bookingError = ref("");
+  const hydratingSelectionFromAddons = ref(false);
 
   const recoLoading = ref(false);
   const recoError = ref("");
@@ -56,51 +63,6 @@ export const useBookingFlow = (isNightRef) => {
     form.value.time = "";
   });
 
-  const moodToEmotionFit = (val) => {
-    switch (val) {
-      case "calm":
-        return {
-          calm: 0.9,
-          happy: 0.4,
-          stressed: 0.2,
-          sad: 0.3,
-          adventurous: 0.3,
-        };
-      case "stressed":
-        return {
-          calm: 0.2,
-          happy: 0.3,
-          stressed: 0.9,
-          sad: 0.2,
-          adventurous: 0.3,
-        };
-      case "sad":
-        return {
-          calm: 0.3,
-          happy: 0.2,
-          stressed: 0.2,
-          sad: 0.9,
-          adventurous: 0.3,
-        };
-      case "adventurous":
-        return {
-          calm: 0.3,
-          happy: 0.6,
-          stressed: 0.3,
-          sad: 0.2,
-          adventurous: 0.9,
-        };
-      default:
-        return {
-          calm: 0.3,
-          happy: 0.9,
-          stressed: 0.2,
-          sad: 0.2,
-          adventurous: 0.4,
-        };
-    }
-  };
-
   const fetchDrinks = async () => {
     try {
       drinks.value = await getDrinks();
@@ -115,12 +77,7 @@ export const useBookingFlow = (isNightRef) => {
     recoLoading.value = true;
     recoError.value = "";
     try {
-      const result = await recoFromFeatures({
-        emotionFit: moodToEmotionFit(mood.value),
-        caffeine: caffeinePref.value || undefined,
-        temp: tempPref.value || undefined,
-        sweetness: sweetness.value,
-      });
+      const result = [];
 
       let mapped = (result || []).map((item) => {
         const drink = resolveDrink(item.drinkId) || {};
@@ -146,7 +103,8 @@ export const useBookingFlow = (isNightRef) => {
 
       reco.value = mapped;
     } catch (err) {
-      recoError.value = err?.message || "Không thể gợi ý lúc này.";
+      recoError.value =
+        err?.message || "Unable to get recommendations right now.";
     } finally {
       recoLoading.value = false;
     }
@@ -197,8 +155,13 @@ export const useBookingFlow = (isNightRef) => {
         if (!id || qty <= 0) continue;
         map[id] = { drink: resolveDrink(id) || {}, qty };
       }
-      if (Object.keys(map).length) selection.value = map;
+      hydratingSelectionFromAddons.value = true;
+      selection.value = map;
+      void nextTick(() => {
+        hydratingSelectionFromAddons.value = false;
+      });
     } catch (err) {
+      hydratingSelectionFromAddons.value = false;
       // ignore
     }
   };
@@ -208,6 +171,8 @@ export const useBookingFlow = (isNightRef) => {
     selection,
     async (val, oldVal) => {
       try {
+        if (hydratingSelectionFromAddons.value) return;
+
         const user = getSessionUser();
         const email = user?.email;
         if (!email) return;
@@ -281,7 +246,8 @@ export const useBookingFlow = (isNightRef) => {
         selection.value = {};
       }
     } catch (err) {
-      bookingError.value = err?.message || "Không thể đặt lúc này.";
+      bookingError.value =
+        err?.message || "Unable to place booking at this time.";
     } finally {
       bookingLoading.value = false;
     }
@@ -325,7 +291,6 @@ export const useBookingFlow = (isNightRef) => {
     form,
     formDate,
     formClock,
-    mood,
     caffeinePref,
     tempPref,
     sweetness,

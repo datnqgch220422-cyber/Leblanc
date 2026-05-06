@@ -44,18 +44,17 @@ type adminBookingPayload struct {
 }
 
 type adminDrinkPayload struct {
-	Name       string            `json:"name"`
-	Price      int               `json:"price"`
-	Stock      int               `json:"stock"`
-	Available  bool              `json:"available"`
-	Tags       []string          `json:"tags"`
-	Caffeine   string            `json:"caffeine"`
-	Temp       string            `json:"temp"`
-	Sweetness  int               `json:"sweetness"`
-	ColorTone  string            `json:"colorTone"`
-	EmotionFit models.EmotionFit `json:"emotionFit"`
-	Image      string            `json:"image"`
-	Desc       string            `json:"desc"`
+	Name      string   `json:"name"`
+	Price     int      `json:"price"`
+	Stock     int      `json:"stock"`
+	Available bool     `json:"available"`
+	Tags      []string `json:"tags"`
+	Caffeine  string   `json:"caffeine"`
+	Temp      string   `json:"temp"`
+	Sweetness int      `json:"sweetness"`
+	ColorTone string   `json:"colorTone"`
+	Image     string   `json:"image"`
+	Desc      string   `json:"desc"`
 }
 
 func AdminListUsers(c *gin.Context) {
@@ -403,18 +402,17 @@ func AdminUpdateDrink(c *gin.Context) {
 	}
 
 	update := bson.M{
-		"name":       drink.Name,
-		"price":      drink.Price,
-		"stock":      drink.Stock,
-		"available":  drink.Available,
-		"tags":       drink.Tags,
-		"caffeine":   drink.Caffeine,
-		"temp":       drink.Temp,
-		"sweetness":  drink.Sweetness,
-		"colorTone":  drink.ColorTone,
-		"emotionFit": drink.EmotionFit,
-		"image":      drink.Image,
-		"desc":       drink.Desc,
+		"name":      drink.Name,
+		"price":     drink.Price,
+		"stock":     drink.Stock,
+		"available": drink.Available,
+		"tags":      drink.Tags,
+		"caffeine":  drink.Caffeine,
+		"temp":      drink.Temp,
+		"sweetness": drink.Sweetness,
+		"colorTone": drink.ColorTone,
+		"image":     drink.Image,
+		"desc":      drink.Desc,
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -541,18 +539,17 @@ func buildDrinkFromPayload(payload adminDrinkPayload) (models.Drink, error) {
 	}
 
 	return models.Drink{
-		Name:       payload.Name,
-		Price:      payload.Price,
-		Stock:      payload.Stock,
-		Available:  payload.Available || payload.Stock > 0,
-		Tags:       normalizeTags(payload.Tags),
-		Caffeine:   normalizeOrDefault(payload.Caffeine, "none"),
-		Temp:       normalizeOrDefault(payload.Temp, "iced"),
-		Sweetness:  payload.Sweetness,
-		ColorTone:  normalizeOrDefault(payload.ColorTone, "neutral"),
-		EmotionFit: payload.EmotionFit,
-		Image:      payload.Image,
-		Desc:       payload.Desc,
+		Name:      payload.Name,
+		Price:     payload.Price,
+		Stock:     payload.Stock,
+		Available: payload.Available || payload.Stock > 0,
+		Tags:      normalizeTags(payload.Tags),
+		Caffeine:  normalizeOrDefault(payload.Caffeine, "none"),
+		Temp:      normalizeOrDefault(payload.Temp, "iced"),
+		Sweetness: payload.Sweetness,
+		ColorTone: normalizeOrDefault(payload.ColorTone, "neutral"),
+		Image:     payload.Image,
+		Desc:      payload.Desc,
 	}, nil
 }
 

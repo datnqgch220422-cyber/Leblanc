@@ -115,7 +115,7 @@ const createEmptyBookingForm = () => ({
   email: "",
   phone: "",
   time: "",
-  guests: 2,
+  guests: 1,
   channel: "admin",
   items: [createEmptyBookingItem()],
   status: "pending",
@@ -132,11 +132,6 @@ const createEmptyDrinkForm = () => ({
   temp: "iced",
   sweetness: 5,
   colorTone: "neutral",
-  calm: 0.5,
-  happy: 0.5,
-  stressed: 0.5,
-  sad: 0.5,
-  adventurous: 0.5,
   image: "",
   desc: "",
 });
@@ -225,7 +220,7 @@ const formatDate = (value) => {
 };
 
 const formatCurrency = (value) =>
-  `${(Number(value) || 0).toLocaleString("vi-VN")} VND`;
+  `${(Number(value) || 0).toLocaleString("en-US")} VND`;
 
 const resolveDrinkName = (id) => {
   const drink = drinks.value.find((item) => item._id === id);
@@ -605,11 +600,6 @@ const editDrink = (drink) => {
     temp: drink.temp || "iced",
     sweetness: drink.sweetness ?? 5,
     colorTone: drink.colorTone || "neutral",
-    calm: drink.emotionFit?.calm ?? 0,
-    happy: drink.emotionFit?.happy ?? 0,
-    stressed: drink.emotionFit?.stressed ?? 0,
-    sad: drink.emotionFit?.sad ?? 0,
-    adventurous: drink.emotionFit?.adventurous ?? 0,
     image: drink.image || "",
     desc: drink.desc || "",
   });
@@ -631,13 +621,6 @@ const buildDrinkPayload = () => ({
   temp: drinkForm.temp,
   sweetness: Math.max(0, Number(drinkForm.sweetness) || 0),
   colorTone: drinkForm.colorTone,
-  emotionFit: {
-    calm: Number(drinkForm.calm) || 0,
-    happy: Number(drinkForm.happy) || 0,
-    stressed: Number(drinkForm.stressed) || 0,
-    sad: Number(drinkForm.sad) || 0,
-    adventurous: Number(drinkForm.adventurous) || 0,
-  },
   image: drinkForm.image.trim(),
   desc: drinkForm.desc.trim(),
 });
@@ -770,7 +753,11 @@ onMounted(async () => {
         <!-- USERS -->
         <div v-if="activeSection === 'users'" class="section">
           <div class="section-layout">
-            <div v-if="showUserForm" class="modal-overlay" @click.self="closeUserForm">
+            <div
+              v-if="showUserForm"
+              class="modal-overlay"
+              @click.self="closeUserForm"
+            >
               <div class="form-card modal-content">
                 <h2>{{ userForm._id ? "Edit User" : "New User" }}</h2>
                 <div v-if="sectionError.users" class="alert alert-error">
@@ -779,15 +766,29 @@ onMounted(async () => {
                 <form @submit.prevent="submitUser">
                   <div class="form-field">
                     <label>Name</label>
-                    <input v-model="userForm.name" type="text" placeholder="Full name" />
+                    <input
+                      v-model="userForm.name"
+                      type="text"
+                      placeholder="Full name"
+                    />
                   </div>
                   <div class="form-field">
                     <label>Email</label>
-                    <input v-model="userForm.email" type="email" placeholder="Email" />
+                    <input
+                      v-model="userForm.email"
+                      type="email"
+                      placeholder="Email"
+                    />
                   </div>
                   <div class="form-field">
                     <label>Password</label>
-                    <input v-model="userForm.password" type="password" :placeholder="userForm._id ? 'Leave blank to keep' : 'Password'" />
+                    <input
+                      v-model="userForm.password"
+                      type="password"
+                      :placeholder="
+                        userForm._id ? 'Leave blank to keep' : 'Password'
+                      "
+                    />
                   </div>
                   <div class="form-field">
                     <label>Role</label>
@@ -797,14 +798,28 @@ onMounted(async () => {
                     </select>
                   </div>
                   <div class="form-field checkbox">
-                    <input v-model="userForm.verified" type="checkbox" id="user-verified" />
+                    <input
+                      v-model="userForm.verified"
+                      type="checkbox"
+                      id="user-verified"
+                    />
                     <label for="user-verified">Verified</label>
                   </div>
                   <div class="form-actions">
                     <button class="btn btn-primary" :disabled="saving.user">
-                      {{ saving.user ? "Saving..." : userForm._id ? "Update" : "Create" }}
+                      {{
+                        saving.user
+                          ? "Saving..."
+                          : userForm._id
+                            ? "Update"
+                            : "Create"
+                      }}
                     </button>
-                    <button class="btn btn-default" type="button" @click="closeUserForm">
+                    <button
+                      class="btn btn-default"
+                      type="button"
+                      @click="closeUserForm"
+                    >
                       Cancel
                     </button>
                   </div>
@@ -853,9 +868,7 @@ onMounted(async () => {
                     >
                   </div>
                   <div class="item-actions">
-                    <button 
-                    class="btn btn-sm" 
-                    @click="editUser(user)">
+                    <button class="btn btn-sm" @click="editUser(user)">
                       Edit</button
                     ><button
                       class="btn btn-sm btn-danger"
@@ -873,7 +886,11 @@ onMounted(async () => {
         <!-- BOOKINGS -->
         <div v-if="activeSection === 'bookings'" class="section">
           <div class="section-layout">
-            <div v-if="showBookingForm" class="modal-overlay" @click.self="closeBookingForm">
+            <div
+              v-if="showBookingForm"
+              class="modal-overlay"
+              @click.self="closeBookingForm"
+            >
               <div class="form-card modal-content">
                 <h2>{{ bookingForm._id ? "Edit Booking" : "New Booking" }}</h2>
                 <div v-if="sectionError.bookings" class="alert alert-error">
@@ -903,7 +920,11 @@ onMounted(async () => {
                   <div class="form-row">
                     <div class="form-field">
                       <label>Guests</label>
-                      <input v-model.number="bookingForm.guests" type="number" min="1" />
+                      <input
+                        v-model.number="bookingForm.guests"
+                        type="number"
+                        min="1"
+                      />
                     </div>
                     <div class="form-field">
                       <label>Status</label>
@@ -917,9 +938,19 @@ onMounted(async () => {
                   </div>
                   <div class="form-actions">
                     <button class="btn btn-primary" :disabled="saving.booking">
-                      {{ saving.booking ? "Saving..." : bookingForm._id ? "Update" : "Create" }}
+                      {{
+                        saving.booking
+                          ? "Saving..."
+                          : bookingForm._id
+                            ? "Update"
+                            : "Create"
+                      }}
                     </button>
-                    <button class="btn btn-default" type="button" @click="closeBookingForm">
+                    <button
+                      class="btn btn-default"
+                      type="button"
+                      @click="closeBookingForm"
+                    >
                       Cancel
                     </button>
                   </div>
@@ -995,38 +1026,157 @@ onMounted(async () => {
         <!-- PRODUCTS -->
         <div v-if="activeSection === 'products'" class="section">
           <div class="section-layout">
-            <div v-if="showDrinkForm" class="modal-overlay" @click.self="closeDrinkForm">
+            <div
+              v-if="showDrinkForm"
+              class="modal-overlay"
+              @click.self="closeDrinkForm"
+            >
               <div class="form-card modal-content">
                 <h2>{{ drinkForm._id ? "Edit Product" : "New Product" }}</h2>
                 <div v-if="sectionError.drinks" class="alert alert-error">
                   {{ sectionError.drinks }}
                 </div>
-                <form @submit.prevent="submitDrink">
+                <form
+                  @submit.prevent="submitDrink"
+                  style="max-height: 80vh; overflow-y: auto"
+                >
+                  <!-- Basic Info -->
                   <div class="form-row">
                     <div class="form-field">
-                      <label>Name</label>
-                      <input v-model="drinkForm.name" type="text" />
+                      <label>Name *</label>
+                      <input
+                        v-model="drinkForm.name"
+                        type="text"
+                        placeholder="e.g., Espresso"
+                      />
                     </div>
                     <div class="form-field">
-                      <label>Price</label>
-                      <input v-model.number="drinkForm.price" type="number" min="0" />
+                      <label>Price (VND)</label>
+                      <input
+                        v-model.number="drinkForm.price"
+                        type="number"
+                        min="0"
+                      />
                     </div>
                   </div>
+
+                  <!-- Description -->
+                  <div class="form-row">
+                    <div class="form-field" style="grid-column: 1 / -1">
+                      <label>Description</label>
+                      <textarea
+                        v-model="drinkForm.desc"
+                        rows="3"
+                        placeholder="Product description..."
+                      ></textarea>
+                    </div>
+                  </div>
+
+                  <!-- Image & Inventory -->
+                  <div class="form-row">
+                    <div class="form-field">
+                      <label>Image URL</label>
+                      <input
+                        v-model="drinkForm.image"
+                        type="url"
+                        placeholder="https://..."
+                      />
+                    </div>
+                  </div>
+
+                  <!-- Stock & Availability -->
                   <div class="form-row">
                     <div class="form-field">
                       <label>Stock</label>
-                      <input v-model.number="drinkForm.stock" type="number" min="0" />
+                      <input
+                        v-model.number="drinkForm.stock"
+                        type="number"
+                        min="0"
+                      />
                     </div>
                     <div class="form-field checkbox">
-                      <input v-model="drinkForm.available" type="checkbox" id="prod-available" />
+                      <input
+                        v-model="drinkForm.available"
+                        type="checkbox"
+                        id="prod-available"
+                      />
                       <label for="prod-available">Available</label>
                     </div>
                   </div>
-                  <div class="form-actions">
+
+                  <!-- Tags -->
+                  <div class="form-row">
+                    <div class="form-field" style="grid-column: 1 / -1">
+                      <label>Tags (comma separated)</label>
+                      <input
+                        v-model="drinkForm.tagsText"
+                        type="text"
+                        placeholder="e.g., day, hot, tea"
+                      />
+                    </div>
+                  </div>
+
+                  <!-- Attributes -->
+                  <div class="form-row">
+                    <div class="form-field">
+                      <label>Caffeine</label>
+                      <select v-model="drinkForm.caffeine">
+                        <option value="none">None</option>
+                        <option value="low">Low</option>
+                        <option value="med">Medium</option>
+                        <option value="high">High</option>
+                      </select>
+                    </div>
+                    <div class="form-field">
+                      <label>Temperature</label>
+                      <select v-model="drinkForm.temp">
+                        <option value="hot">Hot</option>
+                        <option value="iced">Iced</option>
+                        <option value="either">Either</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="form-row">
+                    <div class="form-field">
+                      <label>Sweetness (0-10)</label>
+                      <input
+                        v-model.number="drinkForm.sweetness"
+                        type="range"
+                        min="0"
+                        max="10"
+                      />
+                      <span
+                        style="font-size: 0.85rem; color: rgba(0, 0, 0, 0.6)"
+                        >{{ drinkForm.sweetness }}</span
+                      >
+                    </div>
+                    <div class="form-field">
+                      <label>Color Tone</label>
+                      <select v-model="drinkForm.colorTone">
+                        <option value="warm">Warm</option>
+                        <option value="cool">Cool</option>
+                        <option value="neutral">Neutral</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <!-- Actions -->
+                  <div class="form-actions" style="margin-top: 16px">
                     <button class="btn btn-primary" :disabled="saving.drink">
-                      {{ saving.drink ? "Saving..." : drinkForm._id ? "Update" : "Create" }}
+                      {{
+                        saving.drink
+                          ? "Saving..."
+                          : drinkForm._id
+                            ? "Update"
+                            : "Create"
+                      }}
                     </button>
-                    <button class="btn btn-default" type="button" @click="closeDrinkForm">
+                    <button
+                      class="btn btn-default"
+                      type="button"
+                      @click="closeDrinkForm"
+                    >
                       Cancel
                     </button>
                   </div>
@@ -1273,7 +1423,6 @@ onMounted(async () => {
 
 .section-layout {
   display: block;
-  
 }
 
 /* CARD */
@@ -1317,7 +1466,7 @@ onMounted(async () => {
 
 .form-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 12px;
 }
 
@@ -1666,29 +1815,29 @@ onMounted(async () => {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background-color: rgba(0, 0, 0, 0.6); /* Nền đen mờ */
+  background-color: rgba(0, 0, 0, 0.6); /* Dim black background */
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 9999;
-  backdrop-filter: blur(3px); /* Làm mờ nhẹ background phía sau */
+  backdrop-filter: blur(3px); /* Slightly blur the background */
 }
 
-/* Đè lên class form-card cũ để căn giữa và thêm màu nền solid */
+/* Override form-card class to center and add solid background */
 .modal-content.form-card {
-  background: var(--paper); /* Bắt buộc để không bị nhìn xuyên thấu */
+  background: var(--paper); /* Required to avoid transparent background */
   width: 90%;
-  max-width: 450px;
-  max-height: 90vh;
-  overflow-y: auto; /* Tạo thanh cuộn nếu form quá dài */
-  margin: 0; 
+  max-width: 900px;
+  max-height: 85vh;
+  overflow-y: auto; /* Add scrollbar if form is too long */
+  margin: 0;
   padding: 24px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
   animation: modalFadeIn 0.25s ease-out;
   border: 1px solid rgba(0, 0, 0, 0.1);
 }
 
-/* Tinh chỉnh đổ bóng và viền cho chế độ Dark Mode */
+/* Fine-tune shadow and border for dark mode */
 .admin-page.theme-dark .modal-content.form-card {
   border-color: rgba(255, 255, 255, 0.15);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
@@ -1696,13 +1845,13 @@ onMounted(async () => {
 
 /* Hiệu ứng trượt và mờ dần khi mở Popup */
 @keyframes modalFadeIn {
-  from { 
-    opacity: 0; 
-    transform: translateY(-20px); 
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
   }
-  to { 
-    opacity: 1; 
-    transform: translateY(0); 
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 </style>

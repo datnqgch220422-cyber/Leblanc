@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"net/http"
-	"sort"
 	"time"
 
 	"leblanc/server/internal/db"
@@ -15,7 +14,13 @@ import (
 )
 
 func RecoFromFeatures(c *gin.Context) {
-	var payload services.RecoPayload
+	type RecoRequest struct {
+		Caffeine  string `json:"caffeine"`
+		Temp      string `json:"temp"`
+		Sweetness int    `json:"sweetness"`
+	}
+
+	var payload RecoRequest
 	if err := c.BindJSON(&payload); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}); return
 	}
@@ -31,22 +36,16 @@ func RecoFromFeatures(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}); return
 	}
 
-	type item struct{ D models.Drink; S float64 }
-	var ranked []item
-	for _, d := range drinks {
-		ranked = append(ranked, item{D: d, S: services.ScoreDrink(d, payload)})
-	}
-	sort.Slice(ranked, func(i, j int) bool { return ranked[i].S > ranked[j].S })
-	if len(ranked) > 5 { ranked = ranked[:5] }
+	scores := services.ScoreDrinks(drinks, payload.Caffeine, payload.Temp, payload.Sweetness)
 
-	// attach score to response
-	type out struct {
-		models.Drink
-		Score float64 `json:"score"`
+	// Build response
+	type ScoreItem struct {
+		DrinkID string  `json:"drinkId"`
+		Score   float64 `json:"score"`
 	}
-	resp := make([]out, len(ranked))
-	for i, r := range ranked {
-		resp[i] = out{Drink: r.D, Score: float64(int(r.S*1000)) / 1000.0}
+	resp := make([]ScoreItem, len(scores))
+	for i, s := range scores {
+		resp[i] = ScoreItem{DrinkID: s.DrinkID, Score: s.Score}
 	}
 	c.JSON(http.StatusOK, resp)
 }

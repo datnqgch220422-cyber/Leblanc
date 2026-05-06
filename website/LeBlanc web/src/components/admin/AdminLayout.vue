@@ -1,13 +1,13 @@
 <script setup>
-import { useRouter } from 'vue-router'
-import { clearSessionUser } from '@/composables/useSessionAuth'
+import { useRouter } from "vue-router";
+import { clearSessionUser } from "@/composables/useSessionAuth";
 
-const router = useRouter()
+const router = useRouter();
 
 const handleLogout = () => {
-  clearSessionUser()
-  router.push('/login')
-}
+  clearSessionUser();
+  router.push("/login");
+};
 </script>
 
 <template>
@@ -15,11 +15,11 @@ const handleLogout = () => {
     <aside class="admin-sidebar">
       <h2>LeBlanc Admin</h2>
       <nav>
-        <router-link to="/admin/users">Quản lý Users</router-link>
-        <router-link to="/admin/bookings">Quản lý Đặt bàn</router-link>
-        <router-link to="/admin/drinks">Quản lý Đồ uống</router-link>
+        <router-link to="/admin/users">Manage Users</router-link>
+        <router-link to="/admin/bookings">Manage Bookings</router-link>
+        <router-link to="/admin/drinks">Manage Drinks</router-link>
       </nav>
-      <button @click="handleLogout" class="btn-logout">Đăng xuất</button>
+      <button @click="handleLogout" class="btn-logout">Logout</button>
     </aside>
 
     <main class="admin-content">
@@ -36,7 +36,7 @@ const handleLogout = () => {
 .admin-sidebar {
   width: 250px;
   background: var(--paper);
-  border-right: 1px solid rgba(0,0,0,0.1);
+  border-right: 1px solid rgba(0, 0, 0, 0.1);
   padding: 20px;
   display: flex;
   flex-direction: column;

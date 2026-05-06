@@ -51,7 +51,7 @@ const bookingSummary = (booking) => {
 };
 
 const formatCurrency = (value) =>
-  `${(Number(value) || 0).toLocaleString("vi-VN")} VND`;
+  `${(Number(value) || 0).toLocaleString("en-US")} VND`;
 
 const formatStatus = (status) => {
   switch ((status || "pending").toLowerCase()) {
@@ -159,11 +159,11 @@ onMounted(load);
             :to="{ name: 'order-detail', params: { id: b._id } }"
           >
             <h3>{{ formatDate(b.time) }}</h3>
-            <span class="view-more">Xem chi tiết</span>
+            <span class="view-more">View details</span>
           </RouterLink>
           <p>{{ summarizeItems(b.items) }}</p>
-          <p>Tổng món: {{ b.summary.count }}</p>
-          <p>Tổng tiền đồ uống: {{ formatCurrency(b.summary.total) }}</p>
+          <p>Total items: {{ b.summary.count }}</p>
+          <p>Total drinks price: {{ formatCurrency(b.summary.total) }}</p>
           <p :class="statusClass(b.status)">{{ formatStatus(b.status) }}</p>
           <p>Channel: {{ b.channel || "web" }}</p>
         </article>

@@ -39,7 +39,7 @@ const totals = computed(() => ({
   total: detailItems.value.reduce((s, it) => s + it.lineTotal, 0),
 }));
 
-const formatCurrency = (v) => `${(Number(v) || 0).toLocaleString("vi-VN")} VND`;
+const formatCurrency = (v) => `${(Number(v) || 0).toLocaleString("en-US")} VND`;
 const formatDate = (v) => {
   if (!v) return "—";
   const d = new Date(v);
@@ -105,8 +105,8 @@ onMounted(load);
           </li>
         </ul>
         <div class="summary">
-          <p>Tổng món: {{ totals.count }}</p>
-          <p>Tổng tiền đồ uống: {{ formatCurrency(totals.total) }}</p>
+          <p>Total items: {{ totals.count }}</p>
+          <p>Total drinks price: {{ formatCurrency(totals.total) }}</p>
         </div>
       </section>
     </div>

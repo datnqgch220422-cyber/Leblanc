@@ -66,7 +66,7 @@ func seedDrinks(ctx context.Context) error {
 			Temp:       "iced",
 			Sweetness:  4,
 			ColorTone:  "warm",
-			EmotionFit: models.EmotionFit{Calm: 0.5, Happy: 0.8, Stressed: 0.6, Sad: 0.5, Adventurous: 0.4},
+
 			Image:      assetBase + "/cafe-sua-da.png",
 			Desc:       "Robusta phin from Buon Ma Thuot, condensed milk, ice; bold and creamy Saigon style.",
 		},
@@ -79,7 +79,7 @@ func seedDrinks(ctx context.Context) error {
 			Temp:       "iced",
 			Sweetness:  2,
 			ColorTone:  "cool",
-			EmotionFit: models.EmotionFit{Calm: 0.45, Happy: 0.7, Stressed: 0.5, Sad: 0.4, Adventurous: 0.6},
+
 			Image:      assetBase + "/americano-cam-sa.png",
 			Desc:       "Da Lat Arabica espresso with fresh orange juice and smashed lemongrass; bright citrus aroma.",
 		},
@@ -92,7 +92,7 @@ func seedDrinks(ctx context.Context) error {
 			Temp:       "hot",
 			Sweetness:  3,
 			ColorTone:  "neutral",
-			EmotionFit: models.EmotionFit{Calm: 0.6, Happy: 0.65, Stressed: 0.5, Sad: 0.5, Adventurous: 0.4},
+
 			Image:      assetBase + "/latte-sua-yen-mach.png",
 			Desc:       "Arabica espresso with unsweetened oat milk, fine foam; dairy-free friendly.",
 		},
@@ -105,7 +105,7 @@ func seedDrinks(ctx context.Context) error {
 			Temp:       "iced",
 			Sweetness:  4,
 			ColorTone:  "warm",
-			EmotionFit: models.EmotionFit{Calm: 0.55, Happy: 0.7, Stressed: 0.5, Sad: 0.55, Adventurous: 0.45},
+
 			Image:      assetBase + "/cafe-dua.png",
 			Desc:       "Arabica-Robusta espresso blend with light coconut cream and low-sugar milk, blended with ice.",
 		},
@@ -118,7 +118,7 @@ func seedDrinks(ctx context.Context) error {
 			Temp:       "iced",
 			Sweetness:  3,
 			ColorTone:  "warm",
-			EmotionFit: models.EmotionFit{Calm: 0.6, Happy: 0.75, Stressed: 0.45, Sad: 0.55, Adventurous: 0.45},
+
 			Image:      assetBase + "/tra-dao-cam-sa.png",
 			Desc:       "Cold-brew Ceylon black tea with peach syrup, orange slices, lemongrass, and peach chunks.",
 		},
@@ -131,7 +131,7 @@ func seedDrinks(ctx context.Context) error {
 			Temp:       "hot",
 			Sweetness:  2,
 			ColorTone:  "warm",
-			EmotionFit: models.EmotionFit{Calm: 0.65, Happy: 0.6, Stressed: 0.35, Sad: 0.55, Adventurous: 0.35},
+
 			Image:      assetBase + "/tra-gung-mat-ong.png",
 			Desc:       "Light green tea, fresh ginger slices, and forest honey; soothing for cool mornings.",
 		},
@@ -144,7 +144,7 @@ func seedDrinks(ctx context.Context) error {
 			Temp:       "iced",
 			Sweetness:  3,
 			ColorTone:  "neutral",
-			EmotionFit: models.EmotionFit{Calm: 0.55, Happy: 0.7, Stressed: 0.3, Sad: 0.4, Adventurous: 0.35},
+
 			Image:      assetBase + "/nuoc-ep-cam-ca-rot.png",
 			Desc:       "Fresh orange and carrot juice, no syrup; sweetness adjustable on request.",
 		},
@@ -157,7 +157,7 @@ func seedDrinks(ctx context.Context) error {
 			Temp:       "iced",
 			Sweetness:  3,
 			ColorTone:  "neutral",
-			EmotionFit: models.EmotionFit{Calm: 0.6, Happy: 0.65, Stressed: 0.35, Sad: 0.5, Adventurous: 0.35},
+
 			Image:      assetBase + "/sinh-to-chuoi-yen-mach.png",
 			Desc:       "Ripe banana, rolled oats, almond milk, touch of honey; filling and gym-friendly.",
 		},
@@ -170,7 +170,7 @@ func seedDrinks(ctx context.Context) error {
 			Temp:       "iced",
 			Sweetness:  4,
 			ColorTone:  "cool",
-			EmotionFit: models.EmotionFit{Calm: 0.55, Happy: 0.7, Stressed: 0.4, Sad: 0.45, Adventurous: 0.4},
+
 			Image:      assetBase + "/sua-chua-chanh-day.png",
 			Desc:       "Fermented yogurt with fresh passionfruit sauce, blended with ice; tangy-sweet and creamy.",
 		},
@@ -183,7 +183,7 @@ func seedDrinks(ctx context.Context) error {
 			Temp:       "hot",
 			Sweetness:  3,
 			ColorTone:  "neutral",
-			EmotionFit: models.EmotionFit{Calm: 0.65, Happy: 0.6, Stressed: 0.45, Sad: 0.5, Adventurous: 0.45},
+
 			Image:      assetBase + "/matcha-latte.png",
 			Desc:       "Japanese matcha whisked with fresh milk, steamed; aromatic with gentle bitterness.",
 		},
@@ -196,7 +196,7 @@ func seedDrinks(ctx context.Context) error {
 			Temp:       "hot",
 			Sweetness:  4,
 			ColorTone:  "warm",
-			EmotionFit: models.EmotionFit{Calm: 0.6, Happy: 0.65, Stressed: 0.4, Sad: 0.55, Adventurous: 0.35},
+
 			Image:      assetBase + "/ca-cao-que-nong.png",
 			Desc:       "Natural cacao powder, fresh milk, optional condensed milk, honey or syrup, plus cinnamon dust.",
 		},
@@ -209,7 +209,7 @@ func seedDrinks(ctx context.Context) error {
 			Temp:       "hot",
 			Sweetness:  3,
 			ColorTone:  "warm",
-			EmotionFit: models.EmotionFit{Calm: 0.7, Happy: 0.6, Stressed: 0.35, Sad: 0.55, Adventurous: 0.35},
+
 			Image:      assetBase + "/tra-tao-que-mat-ong-nong.png",
 			Desc:       "Light tea with fresh apple slices, cinnamon stick, honey; optional squeeze of lime.",
 		},
@@ -223,7 +223,7 @@ func seedDrinks(ctx context.Context) error {
 			Temp:       "cold",
 			Sweetness:  4,
 			ColorTone:  "warm",
-			EmotionFit: models.EmotionFit{Calm: 0.45, Happy: 0.65, Stressed: 0.55, Sad: 0.6, Adventurous: 0.7},
+
 			Image:      assetBase + "/midnight-coffee.png",
 			Desc:       "Coffee cocktail with rum or whisky and espresso; warm, boozy coffee sweetness.",
 		},
@@ -236,7 +236,7 @@ func seedDrinks(ctx context.Context) error {
 			Temp:       "cold",
 			Sweetness:  2,
 			ColorTone:  "cool",
-			EmotionFit: models.EmotionFit{Calm: 0.4, Happy: 0.6, Stressed: 0.6, Sad: 0.45, Adventurous: 0.65},
+
 			Image:      assetBase + "/gin-tonic-chanh-buoi.png",
 			Desc:       "Gin and tonic with lemon and grapefruit peel; crisp, aromatic, lightly fizzy.",
 		},
@@ -249,7 +249,7 @@ func seedDrinks(ctx context.Context) error {
 			Temp:       "cold",
 			Sweetness:  3,
 			ColorTone:  "neutral",
-			EmotionFit: models.EmotionFit{Calm: 0.65, Happy: 0.7, Stressed: 0.45, Sad: 0.5, Adventurous: 0.6},
+
 			Image:      assetBase + "/mojito-bac-ha-co-dien.png",
 			Desc:       "White rum, fresh mint, lime, soda; cool and gently sweet.",
 		},
@@ -262,7 +262,7 @@ func seedDrinks(ctx context.Context) error {
 			Temp:       "cold",
 			Sweetness:  3,
 			ColorTone:  "warm",
-			EmotionFit: models.EmotionFit{Calm: 0.4, Happy: 0.6, Stressed: 0.55, Sad: 0.45, Adventurous: 0.6},
+
 			Image:      assetBase + "/rum-coke-chanh.png",
 			Desc:       "White rum and cola with lime; familiar, bubbly, easy-drinking.",
 		},
@@ -275,7 +275,7 @@ func seedDrinks(ctx context.Context) error {
 			Temp:       "cold",
 			Sweetness:  2,
 			ColorTone:  "neutral",
-			EmotionFit: models.EmotionFit{Calm: 0.45, Happy: 0.55, Stressed: 0.55, Sad: 0.55, Adventurous: 0.55},
+
 			Image:      assetBase + "/whisky-highball.png",
 			Desc:       "Whisky with soda, subtle fizz; mellow malt aroma, not harsh.",
 		},
@@ -288,7 +288,7 @@ func seedDrinks(ctx context.Context) error {
 			Temp:       "room",
 			Sweetness:  2,
 			ColorTone:  "warm",
-			EmotionFit: models.EmotionFit{Calm: 0.55, Happy: 0.55, Stressed: 0.45, Sad: 0.65, Adventurous: 0.45},
+
 			Image:      assetBase + "/house-red.png",
 			Desc:       "Fruity red wine, slightly tart; easy, dinner-friendly.",
 		},
@@ -301,7 +301,7 @@ func seedDrinks(ctx context.Context) error {
 			Temp:       "cold",
 			Sweetness:  2,
 			ColorTone:  "cool",
-			EmotionFit: models.EmotionFit{Calm: 0.55, Happy: 0.6, Stressed: 0.4, Sad: 0.55, Adventurous: 0.4},
+
 			Image:      assetBase + "/house-white.png",
 			Desc:       "Bright white wine with mild apple, pear, and citrus notes.",
 		},
@@ -314,7 +314,7 @@ func seedDrinks(ctx context.Context) error {
 			Temp:       "cold",
 			Sweetness:  1,
 			ColorTone:  "neutral",
-			EmotionFit: models.EmotionFit{Calm: 0.45, Happy: 0.55, Stressed: 0.4, Sad: 0.35, Adventurous: 0.35},
+
 			Image:      assetBase + "/beer.png",
 			Desc:       "Cold lager, lightly bitter, crisp and easy.",
 		},
@@ -327,7 +327,7 @@ func seedDrinks(ctx context.Context) error {
 			Temp:       "cold",
 			Sweetness:  1,
 			ColorTone:  "warm",
-			EmotionFit: models.EmotionFit{Calm: 0.45, Happy: 0.55, Stressed: 0.45, Sad: 0.4, Adventurous: 0.55},
+
 			Image:      assetBase + "/crafted-beer.png",
 			Desc:       "Pale ale, IPA, or wheat rotates; mildly bitter, hoppy or fruity depending on tap.",
 		},
@@ -340,7 +340,7 @@ func seedDrinks(ctx context.Context) error {
 			Temp:       "cold",
 			Sweetness:  4,
 			ColorTone:  "warm",
-			EmotionFit: models.EmotionFit{Calm: 0.55, Happy: 0.65, Stressed: 0.4, Sad: 0.6, Adventurous: 0.5},
+
 			Image:      assetBase + "/plum-liqueur.png",
 			Desc:       "Japanese-style plum liqueur; sweet fruit aroma, guest-friendly.",
 		},

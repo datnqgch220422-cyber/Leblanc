@@ -35,12 +35,12 @@ const {
     <div class="panel form">
       <p class="eyebrow">Reservation</p>
       <h1>Book your table</h1>
-      <p class="lede">Giữ chỗ và thêm đồ uống trước nếu bạn muốn.</p>
+      <p class="lede">Reserve a table and optionally pre-order drinks.</p>
 
       <form class="form-fields" @submit.prevent="book">
         <label>
           Name
-          <input v-model="form.name" placeholder="Nguyễn Văn A" />
+          <input v-model="form.name" placeholder="John Doe" />
         </label>
         <label>
           Phone
@@ -90,7 +90,7 @@ const {
           <span v-else>Book table{{ totalItems ? " & drinks" : "" }}</span>
         </button>
         <p v-if="bookingOk" class="status success">
-          Đặt bàn đã được tạo. Đang chuyển sang thanh toán VNPay...
+          Booking created. Redirecting to VNPay payment...
         </p>
         <p v-if="bookingError && !bookingOk" class="status error">
           {{ bookingError }}
@@ -113,7 +113,7 @@ const {
               <div class="meta">
                 {{
                   item.drink?.price
-                    ? item.drink.price.toLocaleString("vi-VN") + " VND"
+                    ? item.drink.price.toLocaleString("en-US") + " VND"
                     : "—"
                 }}
               </div>
@@ -132,7 +132,7 @@ const {
                 class="mini"
                 @click="updateQty(item.drinkId, -item.qty)"
               >
-                Xóa
+                Remove
               </button>
             </div>
           </div>

@@ -47,15 +47,13 @@ const logout = () => {
           <h2>Booking Hub</h2>
         </div>
         <div class="actions">
-          <RouterLink to="/booking/addons" class="btn btn-link"
-            >Đồ uống kèm bàn</RouterLink
-          >
+          <RouterLink to="/booking" class="btn btn-link">Booking</RouterLink>
           <RouterLink to="/orders" class="btn btn-link">My Orders</RouterLink>
         </div>
       </div>
       <p class="muted">
-        Chọn đồ uống đi kèm lịch đặt bàn ở mục "Đồ uống kèm bàn", sau đó theo
-        dõi trạng thái tại "My Orders".
+        Manage bookings and pre-order accompanying drinks directly on the
+        Booking page, then track status in "My Orders".
       </p>
     </div>
   </section>

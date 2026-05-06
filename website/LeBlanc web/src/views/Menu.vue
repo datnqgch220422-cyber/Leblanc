@@ -383,7 +383,7 @@ const fetchDrinks = async () => {
 const imgFor = (drink, idx) =>
   drink.image || placeholders[idx % placeholders.length];
 const formatCurrency = (value) =>
-  `${(Number(value) || 0).toLocaleString("vi-VN")} VND`;
+  `${(Number(value) || 0).toLocaleString("en-US")} VND`;
 const formatSweetness = (value) => {
   if (value === undefined || value === null || value === "") return "";
   return typeof value === "number"
@@ -404,16 +404,16 @@ const { add } = useCart();
 const addToBookingAddons = async (drinkId) => {
   try {
     await add(drinkId, 1);
-    toast.value = "Đã thêm đồ uống vào danh sách kèm đặt bàn";
+    toast.value = "Drink added to booking";
     setTimeout(() => {
       toast.value = "";
     }, 1800);
   } catch (err) {
-    toast.value = "Vui lòng đăng nhập để chọn đồ uống kèm bàn";
+    toast.value = "Please sign in to add drinks to your booking";
     setTimeout(() => {
       toast.value = "";
     }, 1800);
-    console.warn("Add to booking add-ons failed", err);
+    console.warn("Add to booking failed", err);
   }
 };
 
@@ -531,7 +531,7 @@ onMounted(fetchDrinks);
                 :disabled="resolveAvailability(drink) === false"
                 @click="addToBookingAddons(drink._id)"
               >
-                Chọn kèm bàn
+                Add to booking
               </button>
             </div>
           </div>

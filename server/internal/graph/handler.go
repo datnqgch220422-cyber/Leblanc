@@ -82,12 +82,6 @@ func executeQuery(ctx context.Context, resolver *Resolver, query string, variabl
 			}
 		}
 		if contains(query, "recommendFromFeatures") {
-			var emotionFit EmotionFitInput
-			if emotionData, ok := variables["emotionFit"].(map[string]interface{}); ok {
-				jsonData, _ := json.Marshal(emotionData)
-				_ = json.Unmarshal(jsonData, &emotionFit)
-			}
-
 			var caffeine, temp *string
 			var sweetness *int
 
@@ -102,7 +96,7 @@ func executeQuery(ctx context.Context, resolver *Resolver, query string, variabl
 				sweetness = &sInt
 			}
 
-			scores, err := resolver.RecommendFromFeatures(ctx, emotionFit, caffeine, temp, sweetness)
+			scores, err := resolver.RecommendFromFeatures(ctx, caffeine, temp, sweetness)
 			if err != nil {
 				return nil, err
 			}

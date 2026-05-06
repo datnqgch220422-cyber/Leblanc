@@ -8,30 +8,30 @@ const bookingTotal = computed(() => Number(route.query.total || 0));
 const bookingItems = computed(() => Number(route.query.items || 0));
 
 const formatCurrency = (value) =>
-  `${(Number(value) || 0).toLocaleString("vi-VN")} VND`;
+  `${(Number(value) || 0).toLocaleString("en-US")} VND`;
 </script>
 
 <template>
   <section class="confirm">
-    <h1>Booking đã được tạo</h1>
+    <h1>Booking created</h1>
     <p>
-      Cảm ơn bạn đã đặt bàn và chọn đồ uống kèm.
+      Thank you for your booking and selecting accompanying drinks.
       <span v-if="bookingId"
-        >Mã booking: <strong>{{ bookingId }}</strong
+        >Booking ID: <strong>{{ bookingId }}</strong
         >.</span
       >
     </p>
     <div class="summary">
       <p>
-        Tổng món: <strong>{{ bookingItems }}</strong>
+        Total items: <strong>{{ bookingItems }}</strong>
       </p>
       <p>
-        Tổng tiền đồ uống: <strong>{{ formatCurrency(bookingTotal) }}</strong>
+        Total drinks price: <strong>{{ formatCurrency(bookingTotal) }}</strong>
       </p>
     </div>
     <div class="actions">
-      <RouterLink class="btn" to="/orders">Xem My Orders</RouterLink>
-      <RouterLink class="btn ghost" to="/menu">Quay lại Menu</RouterLink>
+      <RouterLink class="btn" to="/orders">View My Orders</RouterLink>
+      <RouterLink class="btn ghost" to="/menu">Back to Menu</RouterLink>
     </div>
   </section>
 </template>

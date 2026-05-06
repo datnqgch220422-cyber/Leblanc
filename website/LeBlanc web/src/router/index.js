@@ -25,13 +25,11 @@ const router = createRouter({
     },
     {
       path: "/booking/addons",
-      name: "booking-addons",
-      component: () => import("@/views/BookingAddons.vue"),
-      meta: { requiresAuth: true },
+      redirect: { path: "/booking" },
     },
     {
       path: "/cart",
-      redirect: { path: "/booking/addons" },
+      redirect: { path: "/booking" },
     },
     {
       path: "/orders",

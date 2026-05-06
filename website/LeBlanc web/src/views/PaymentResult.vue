@@ -47,13 +47,13 @@ const displayIsSuccess = computed(
 );
 const displayMessage = computed(() => {
   if (syncState.value.paymentMessage) return syncState.value.paymentMessage;
-  if (isPaidOnServer.value) return "VNPay đã xác nhận giao dịch.";
-  if (isFailedOnServer.value) return "Giao dịch chưa hoàn tất.";
+  if (isPaidOnServer.value) return "VNPay has confirmed the transaction.";
+  if (isFailedOnServer.value) return "Transaction incomplete.";
   return (
     message.value ||
     (isSuccess.value
-      ? "VNPay đã xác nhận giao dịch."
-      : "Giao dịch chưa hoàn tất.")
+      ? "VNPay has confirmed the transaction."
+      : "Transaction incomplete.")
   );
 });
 
@@ -96,7 +96,7 @@ const maybeSendEmail = async () => {
     }
   } catch (err) {
     emailError.value =
-      err?.message || "Không thể gửi email xác nhận sau thanh toán";
+      err?.message || "Unable to send confirmation email after payment";
   } finally {
     emailSending.value = false;
   }
@@ -135,14 +135,14 @@ const syncPaymentStatus = async () => {
     syncError.value =
       err?.response?.data?.error ||
       err?.message ||
-      "Không thể đồng bộ trạng thái thanh toán";
+      "Unable to sync payment status";
   } finally {
     syncing.value = false;
   }
 };
 
 const formatCurrency = (value) =>
-  `${(Number(value) || 0).toLocaleString("vi-VN")} VND`;
+  `${(Number(value) || 0).toLocaleString("en-US")} VND`;
 
 onMounted(async () => {
   await syncPaymentStatus();
@@ -159,11 +159,7 @@ onBeforeUnmount(() => {
 <template>
   <section class="payment-result">
     <h1>
-      {{
-        displayIsSuccess
-          ? "Thanh toán thành công"
-          : "Thanh toán chưa thành công"
-      }}
+      {{ displayIsSuccess ? "Payment successful" : "Payment not successful" }}
     </h1>
     <p
       class="status"
@@ -172,38 +168,36 @@ onBeforeUnmount(() => {
       {{
         displayMessage ||
         (displayIsSuccess
-          ? "VNPay đã xác nhận giao dịch."
-          : "Giao dịch chưa hoàn tất.")
+          ? "VNPay has confirmed the transaction."
+          : "Transaction incomplete.")
       }}
     </p>
 
-    <p v-if="syncing" class="syncing">Đang đồng bộ trạng thái thanh toán...</p>
+    <p v-if="syncing" class="syncing">Syncing payment status...</p>
     <p v-else-if="syncError" class="syncing error-text">{{ syncError }}</p>
     <p v-else-if="syncState.paymentStatus === 'pending'" class="syncing">
-      Trang sẽ tự kiểm tra lại trạng thái trong lúc chờ VNPay xác nhận.
+      The page will auto-check the status while waiting for VNPay confirmation.
     </p>
-    <p v-if="emailSending" class="syncing">Đang gửi mail xác nhận...</p>
+    <p v-if="emailSending" class="syncing">Sending confirmation email...</p>
     <p v-else-if="emailSent" class="syncing success-text">
-      Email xác nhận đã được gửi sau khi thanh toán thành công.
+      Confirmation email has been sent after successful payment.
     </p>
     <p v-else-if="emailError" class="syncing error-text">{{ emailError }}</p>
 
     <div class="info">
-      <p><strong>Mã đơn thanh toán:</strong> {{ orderId || "—" }}</p>
-      <p><strong>Mã giao dịch:</strong> {{ transactionNo || "—" }}</p>
+      <p><strong>Payment order ID:</strong> {{ orderId || "—" }}</p>
+      <p><strong>Transaction ID:</strong> {{ transactionNo || "—" }}</p>
       <p>
-        <strong>Số tiền:</strong> {{ amount ? formatCurrency(amount) : "—" }}
+        <strong>Amount:</strong> {{ amount ? formatCurrency(amount) : "—" }}
       </p>
-      <p><strong>Mã kết quả:</strong> {{ responseCode || "—" }}</p>
-      <p><strong>Trạng thái hệ thống:</strong> {{ syncState.paymentStatus }}</p>
+      <p><strong>Response code:</strong> {{ responseCode || "—" }}</p>
+      <p><strong>System status:</strong> {{ syncState.paymentStatus }}</p>
     </div>
 
     <div class="actions">
-      <button class="btn" type="button" @click="refreshNow">
-        Làm mới ngay
-      </button>
-      <RouterLink class="btn" to="/orders">Xem đơn của tôi</RouterLink>
-      <RouterLink class="btn ghost" to="/booking">Quay lại booking</RouterLink>
+      <button class="btn" type="button" @click="refreshNow">Refresh now</button>
+      <RouterLink class="btn" to="/orders">View my orders</RouterLink>
+      <RouterLink class="btn ghost" to="/booking">Back to booking</RouterLink>
     </div>
   </section>
 </template>
