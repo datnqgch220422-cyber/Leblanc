@@ -17,6 +17,7 @@ const form = reactive({
 const loading = ref(false);
 const error = ref("");
 const message = ref("");
+const showPassword = ref(false);
 
 const getSafeRedirect = () => {
   const redirect = router.currentRoute.value.query.redirect;
@@ -92,10 +93,20 @@ const handleSubmit = async () => {
         </label>
 
         <label class="field">
-          <span>Password</span>
+          <div class="field__header">
+            <span>Password</span>
+            <button
+              class="toggle-pwd"
+              type="button"
+              @click="showPassword = !showPassword"
+              :title="showPassword ? 'Hide password' : 'Show password'"
+            >
+              {{ showPassword ? "Hide" : "Show" }}
+            </button>
+          </div>
           <input
             v-model="form.password"
-            type="password"
+            :type="showPassword ? 'text' : 'password'"
             placeholder="Enter your password"
             autocomplete="current-password"
           />
@@ -185,9 +196,32 @@ h1 {
   color: #f6efe6;
 }
 
+.field__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .field span {
   font-size: 0.92rem;
   letter-spacing: 0.02em;
+}
+
+.toggle-pwd {
+  padding: 0;
+  border: none;
+  background: none;
+  color: #b88443;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color 0.18s ease;
+  text-decoration: underline;
+}
+
+.toggle-pwd:hover {
+  color: #c8954f;
 }
 
 .field input {

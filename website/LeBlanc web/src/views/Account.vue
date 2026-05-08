@@ -1,14 +1,103 @@
 <script setup>
-import { ref } from "vue";
+import { computed, reactive, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
-import { clearSessionUser, getSessionUser } from "@/composables/useSessionAuth";
+import {
+  getSession,
+  getSessionUser,
+  persistSession,
+} from "@/composables/useSessionAuth";
 
 const router = useRouter();
 const user = ref(getSessionUser());
+const form = reactive({
+  name: user.value?.name ?? "",
+  email: user.value?.email ?? "",
+  password: "",
+  confirmPassword: "",
+});
+const isSaving = ref(false);
+const successMessage = ref("");
+const errorMessage = ref("");
+const showPassword = ref(false);
+const showConfirm = ref(false);
 
-const logout = () => {
-  clearSessionUser();
-  router.push("/login");
+const hasChanges = computed(() => {
+  const nameChanged = form.name.trim() !== (user.value?.name ?? "");
+  const emailChanged = form.email.trim() !== (user.value?.email ?? "");
+  const passwordChanged =
+    form.password.trim() !== "" || form.confirmPassword.trim() !== "";
+  return nameChanged || emailChanged || passwordChanged;
+});
+
+const isSaveDisabled = computed(() => {
+  return !hasChanges.value || isSaving.value;
+});
+
+const saveAccount = () => {
+  if (!user.value) {
+    return;
+  }
+
+  const trimmedName = form.name.trim();
+  const trimmedEmail = form.email.trim();
+
+  successMessage.value = "";
+  errorMessage.value = "";
+
+  if (!trimmedName) {
+    errorMessage.value = "Username cannot be empty.";
+    return;
+  }
+
+  if (!trimmedEmail) {
+    errorMessage.value = "Email cannot be empty.";
+    return;
+  }
+
+  const passwordTrimmed = form.password.trim();
+  const confirmTrimmed = form.confirmPassword.trim();
+
+  if (passwordTrimmed && !confirmTrimmed) {
+    errorMessage.value = "Please confirm your new password.";
+    return;
+  }
+
+  if (!passwordTrimmed && confirmTrimmed) {
+    errorMessage.value = "Please enter your new password.";
+    return;
+  }
+
+  if (passwordTrimmed) {
+    if (passwordTrimmed.length < 6) {
+      errorMessage.value = "New password must be at least 6 characters.";
+      return;
+    }
+
+    if (passwordTrimmed !== confirmTrimmed) {
+      errorMessage.value = "Password confirmation does not match.";
+      return;
+    }
+  }
+
+  isSaving.value = true;
+
+  const updatedUser = {
+    ...user.value,
+    name: trimmedName,
+    email: trimmedEmail,
+    ...(passwordTrimmed ? { password: passwordTrimmed } : {}),
+  };
+
+  persistSession({
+    user: updatedUser,
+    token: getSession()?.token ?? "",
+  });
+
+  user.value = updatedUser;
+  form.password = "";
+  form.confirmPassword = "";
+  successMessage.value = "Account information has been updated.";
+  isSaving.value = false;
 };
 </script>
 
@@ -18,43 +107,78 @@ const logout = () => {
       <div>
         <p class="eyebrow">Le'Blanc</p>
         <h1>Your account</h1>
-        <p class="lede">
-          View who is signed in and jump back to the experience.
-        </p>
       </div>
       <RouterLink to="/" class="btn-ghost">Back to home</RouterLink>
     </header>
 
-    <div class="card" v-if="user">
-      <div class="avatar">{{ (user.name?.[0] || "A").toUpperCase() }}</div>
-      <div class="meta">
-        <p class="name">{{ user.name }}</p>
-        <p class="email">{{ user.email }}</p>
-      </div>
-      <div class="actions">
-        <button class="btn" type="button" @click="logout">Log out</button>
-      </div>
-    </div>
-
-    <div class="card empty" v-else>
-      <p>You are not signed in. Redirecting to login...</p>
-    </div>
-
-    <div class="history card-block" v-if="user">
-      <div class="history__header">
+    <div class="card-block editor" v-if="user">
+      <div class="editor__header">
         <div>
           <p class="eyebrow">Le'Blanc</p>
-          <h2>Booking Hub</h2>
-        </div>
-        <div class="actions">
-          <RouterLink to="/booking" class="btn btn-link">Booking</RouterLink>
-          <RouterLink to="/orders" class="btn btn-link">My Orders</RouterLink>
+          <h2>Edit account</h2>
         </div>
       </div>
-      <p class="muted">
-        Manage bookings and pre-order accompanying drinks directly on the
-        Booking page, then track status in "My Orders".
-      </p>
+
+      <form class="editor__form" @submit.prevent="saveAccount">
+        <label class="field">
+          <span>Username</span>
+          <input v-model="form.name" type="text" autocomplete="username" />
+        </label>
+
+        <label class="field">
+          <span>Email</span>
+          <input v-model="form.email" type="email" autocomplete="email" />
+        </label>
+
+        <label class="field">
+          <div class="field__header">
+            <span>New Password</span>
+            <button
+              class="toggle-pwd"
+              type="button"
+              @click="showPassword = !showPassword"
+              :title="showPassword ? 'Hide password' : 'Show password'"
+            >
+              {{ showPassword ? "Hide" : "Show" }}
+            </button>
+          </div>
+          <input
+            v-model="form.password"
+            :type="showPassword ? 'text' : 'password'"
+            autocomplete="new-password"
+            placeholder="Enter new password"
+          />
+        </label>
+
+        <label class="field">
+          <div class="field__header">
+            <span>Confirm Password</span>
+            <button
+              class="toggle-pwd"
+              type="button"
+              @click="showConfirm = !showConfirm"
+              :title="showConfirm ? 'Hide password' : 'Show password'"
+            >
+              {{ showConfirm ? "Hide" : "Show" }}
+            </button>
+          </div>
+          <input
+            v-model="form.confirmPassword"
+            :type="showConfirm ? 'text' : 'password'"
+            autocomplete="new-password"
+            placeholder="Confirm new password"
+          />
+        </label>
+
+        <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
+        <p v-if="successMessage" class="success">{{ successMessage }}</p>
+
+        <div class="editor__actions">
+          <button class="btn" type="submit" :disabled="isSaveDisabled">
+            {{ isSaving ? "Saving..." : "Save changes" }}
+          </button>
+        </div>
+      </form>
     </div>
   </section>
 </template>
@@ -166,25 +290,79 @@ h1 {
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.08);
 }
 
-.history__header {
+.editor {
+  gap: 18px;
+}
+
+.editor__header {
   display: flex;
-  align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 
-.history-list {
+.editor__form {
   display: grid;
-  gap: 12px;
+  gap: 14px;
 }
 
-.history-item {
+.field {
   display: grid;
-  gap: 6px;
-  padding: 14px 16px;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.field span {
+  color: rgba(0, 0, 0, 0.8);
+}
+
+.field input {
+  width: 100%;
+  padding: 12px 14px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: rgba(255, 255, 255, 0.75);
+  color: #0b0b0b;
+  font: inherit;
+  outline: none;
+}
+
+.field input:focus {
+  border-color: rgba(184, 132, 67, 0.7);
+  box-shadow: 0 0 0 3px rgba(184, 132, 67, 0.16);
+}
+
+.field__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.toggle-pwd {
+  padding: 0;
+  border: none;
+  background: none;
+  color: #b88443;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color 0.18s ease;
+  text-decoration: underline;
+}
+
+.toggle-pwd:hover {
+  color: #c8954f;
+}
+
+.editor__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.success {
+  margin: 0;
+  color: #166534;
+  font-weight: 700;
 }
 
 .empty-state,
@@ -207,6 +385,11 @@ h1 {
 
 .error {
   color: #9d3412;
+}
+
+.btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .btn {

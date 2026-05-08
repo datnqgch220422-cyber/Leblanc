@@ -1,0 +1,1709 @@
+================================================================================
+                 TÀI LIỆU CHI TIẾT DỰ ÁN LEBLANC
+================================================================================
+
+NGÀY CẬP NHẬT: 2025-05-09
+PHIÊN BẢN: 1.0
+
+================================================================================
+1. TỔNG QUAN DỰ ÁN
+================================================================================
+
+LeBlanc là một ứng dụng quản lý đặt bàn và đặt hàng trực tuyến cho nhà hàng
+quán cà phê, được xây dựng với:
+
+• Backend: Go (Golang) sử dụng Gin Framework + MongoDB
+• Frontend: Vue 3 (Vue.js 3) sử dụng Vite + Semantic UI
+• API: Hỗ trợ cả REST API và GraphQL
+• Thanh toán: Tích hợp VNPay
+• Xác nhận email: Sử dụng EmailJS
+• Deployment: Fly.io (Backend), Vercel (Frontend)
+
+Đối tượng sử dụng:
+- Người dùng bình thường: Xem menu, đặt bàn, đặt hàng, thanh toán
+- Admin: Quản lý người dùng, đơn hàng, sản phẩm
+
+================================================================================
+2. KIẾN TRÚC HỆ THỐNG
+================================================================================
+
+2.1 TỔNG QUAN KIẾN TRÚC
+─────────────────────────
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                        CLIENT (Vue.js)                              │
+│                  (Vercel: le-blanc-web.vercel.app)                 │
+│                                                                     │
+│  • Home.vue - Trang chủ                                            │
+│  • Menu.vue - Xem menu/danh sách đồ uống                          │
+│  • Booking.vue - Đặt bàn                                           │
+│  • Cart - Giỏ hàng                                                 │
+│  • Admin.vue - Quản trị viên                                       │
+└──────────────────┬────────────────────────────────────────────────┘
+                   │
+         ┌─────────▼──────────┐
+         │   HTTP/GraphQL     │
+         │   (REST API)       │
+         └─────────┬──────────┘
+                   │
+┌──────────────────▼────────────────────────────────────────────────────┐
+│                      SERVER (Go/Gin)                                  │
+│                  (Fly.io: server-wandering-tree-4946...)             │
+│                                                                      │
+│  • main.go - Entry point                                            │
+│  • handlers/ - HTTP request handlers                                │
+│  • services/ - Business logic                                       │
+│  • models/ - Data structures                                        │
+│  • graph/ - GraphQL schema & resolvers                             │
+│  • db/ - MongoDB connection                                        │
+│  • utils/ - Utility functions                                      │
+└──────────────────┬───────────────────────────────────────────────────┘
+                   │
+         ┌─────────▼──────────────┐
+         │   BSON/MongoDB Driver  │
+         └─────────┬──────────────┘
+                   │
+┌──────────────────▼───────────────────────────────────────────────────┐
+│                     DATABASE (MongoDB)                               │
+│                                                                      │
+│  Collections:                                                       │
+│  • users          - Thông tin người dùng                           │
+│  • drinks         - Menu đồ uống                                   │
+│  • bookings       - Đơn đặt bàn                                    │
+│  • carts          - Giỏ hàng                                       │
+│  • bookingaddons  - Thêm sản phẩm vào đơn                         │
+└──────────────────────────────────────────────────────────────────────┘
+
+2.2 LUỒNG HOẠT ĐỘNG CHÍNH
+──────────────────────────
+
+A. LUỒNG ĐẶT BÀN:
+   1. Người dùng truy cập Booking.vue
+   2. Chọn thời gian, số khách, đồ uống
+   3. Gửi POST /bookings (REST) hoặc createBooking (GraphQL)
+   4. Server xử lý, lưu vào MongoDB
+   5. Gửi email xác nhận qua EmailJS
+   6. Chuyển hướng đến trang xác nhận thanh toán
+   7. Người dùng thanh toán qua VNPay
+   8. VNPay callback trả về trạng thái thanh toán
+
+B. LUỒNG XÁC THỰC:
+   1. Người dùng nhập email/password trên Login.vue
+   2. Gửi POST /auth/login
+   3. Server xác minh mật khẩu (bcrypt)
+   4. Tạo JWT token (HMAC-SHA256)
+   5. Trả về token cho client
+   6. Client lưu token vào localStorage
+   7. Mỗi request tiếp theo gửi token trong Authorization header
+
+C. LUỒNG GỌI Ý ĐỒNG UỐNG:
+   1. Frontend gửi POST /reco/from-features
+   2. Gửi các tham số: caffeine, temp, sweetness
+   3. Server điểm số tất cả đồ uống dựa trên preference
+   4. Sắp xếp theo điểm số
+   5. Trả về danh sách gợi ý
+
+================================================================================
+3. CHI TIẾT BACKEND (GO SERVER)
+================================================================================
+
+3.1 CẤU TRÚC THƯ MỤC
+─────────────────────
+
+server/
+├── main.go                    # Entry point, cấu hình Gin, CORS, routes
+├── go.mod                     # Go module definition
+├── go.sum                     # Go dependencies lock file
+├── .env                       # Environment variables (local)
+├── fly.toml                   # Fly.io deployment config
+├── Dockerfile                 # Docker configuration cho Fly.io
+├── gqlgen.yml                 # GraphQL code generation config
+├── app.exe                    # Compiled executable (local)
+├── cmd/
+│   └── seed/
+│       └── main.go            # Database seeder (tạo admin, mẫu dữ liệu)
+└── internal/
+    ├── db/
+    │   └── mongo.go           # MongoDB initialization & connection
+    ├── models/
+    │   ├── user.go            # User model (User, PublicUser)
+    │   ├── drink.go           # Drink model
+    │   ├── booking.go         # Booking, BookingItem model
+    │   ├── booking_status.go  # Booking status constants
+    │   ├── cart.go            # Cart, CartItem model
+    │   ├── payment_status.go  # Payment status constants
+    └── handlers/
+    │   ├── users.go           # User endpoints (GET /users, POST /users, etc.)
+    │   ├── drinks.go          # Drinks endpoints (GET /drinks, POST /drinks, etc.)
+    │   ├── bookings.go        # Bookings endpoints
+    │   ├── cart.go            # Cart endpoints
+    │   ├── payment.go         # Payment/VNPay endpoints
+    │   ├── admin_auth.go      # Admin authentication middleware
+    │   ├── admin_crud.go      # Admin CRUD operations
+    │   ├── reco.go            # Recommendation endpoint
+    │   ├── http_response.go   # Response helper functions
+    ├── services/
+    │   ├── token.go           # Token generation & verification
+    │   ├── vnpay.go           # VNPay payment service
+    │   ├── reco_score.go      # Drink recommendation scoring
+    │   ├── admin_seed.go      # Create admin user
+    ├── graph/
+    │   ├── schema.graphql     # GraphQL schema definition
+    │   ├── handler.go         # GraphQL HTTP handler
+    │   ├── resolver.go        # GraphQL resolvers implementation
+    └── utils/
+        └── response.go        # Response utilities
+
+3.2 MÔ TẢ CHI TIẾT CÁC FILE QUAN TRỌNG
+────────────────────────────────────────
+
+A. main.go
+──────────
+Chức năng:
+- Load environment variables từ .env
+- Khởi tạo MongoDB connection
+- Tạo admin user mặc định
+- Cấu hình Gin router với CORS
+- Đăng ký tất cả REST API endpoints
+- Đăng ký GraphQL endpoint
+- Khởi động server trên port (mặc định: 4000)
+
+CORS Configuration:
+  - Allow Origins: http://localhost:3000, http://localhost:5173, 
+                   http://127.0.0.1:3000, http://127.0.0.1:5173,
+                   https://le-blanc-web.vercel.app
+  - Allow Methods: GET, POST, PUT, DELETE, OPTIONS, PATCH
+  - Allow Headers: Content-Type, Authorization, X-Requested-With
+  - Max Age: 3600 seconds
+
+B. internal/models/
+───────────────────
+
+1. User (user.go)
+   Fields:
+   - ID: MongoDB ObjectID (unique identifier)
+   - Name: Tên người dùng
+   - NameLower: Tên chữ thường (để tìm kiếm không phân biệt hoa/thường)
+   - Email: Email người dùng
+   - EmailLower: Email chữ thường
+   - Role: "admin" hoặc empty (người dùng bình thường)
+   - Verified: Trạng thái xác nhận email
+   - PasswordHash: Hash mật khẩu (bcrypt)
+   - CreatedAt: Thời gian tạo
+   
+   PublicUser: Phiên bản công khai của User (không chứa PasswordHash)
+
+2. Drink (drink.go)
+   Fields:
+   - ID: MongoDB ObjectID
+   - Name: Tên đồ uống
+   - Price: Giá (đơn vị: VND)
+   - Stock: Số lượng còn trong kho
+   - Available: Trạng thái còn bán không
+   - Tags: Nhãn (vd: ["hot", "coffee", "premium"])
+   - Caffeine: Mức caffeine ("low", "med", "high")
+   - Temp: Nhiệt độ ("hot", "iced", "either")
+   - Sweetness: Mức độ ngọt (0-10)
+   - ColorTone: Tông màu ("warm", "cool", "neutral")
+   - Image: URL hình ảnh
+   - Desc: Mô tả sản phẩm
+
+3. Booking (booking.go)
+   Fields:
+   - ID: MongoDB ObjectID
+   - Email: Email người đặt
+   - Name: Tên khách
+   - Phone: Số điện thoại
+   - Time: Thời gian đặt bàn
+   - Guests: Số khách
+   - Items: Mảng BookingItem
+   - Status: Trạng thái ("pending", "confirmed", "cancelled")
+   - Channel: Kênh đặt ("web", "admin", "phone")
+   - PaymentMethod: Phương thức thanh toán ("cash", "vnpay")
+   - PaymentStatus: Trạng thái thanh toán ("pending", "completed", "failed")
+   - PaymentAmount: Số tiền thanh toán
+   - PaymentOrderID: Mã đơn hàng VNPay
+   - PaymentTransID: ID giao dịch VNPay
+   - PaymentMessage: Thông báo thanh toán
+
+4. Cart (cart.go)
+   Fields:
+   - Email: Email người dùng (unique identifier)
+   - Items: Mảng CartItem
+
+C. internal/handlers/
+──────────────────────
+
+1. drinks.go
+   Endpoints:
+   - GET /drinks - Lấy danh sách đồ uống
+     Query params: q (search), available (boolean), stock (positive/zero)
+     Response: Array of Drink
+   
+   - GET /admin/drinks - Lấy danh sách đồ uống (admin)
+     Auth: Yêu cầu admin token
+   
+   - POST /admin/drinks - Tạo đồ uống mới (admin)
+     Body: Drink object
+     Response: Created drink with ID
+   
+   - PUT /admin/drinks/:id - Cập nhật đồ uống (admin)
+     Body: Updated Drink object
+   
+   - DELETE /admin/drinks/:id - Xóa đồ uống (admin)
+
+2. bookings.go
+   Endpoints:
+   - GET /bookings - Lấy danh sách đặt bàn
+   
+   - POST /bookings - Tạo đơn đặt bàn
+     Body: {email, name, phone, time, guests, items, channel}
+     Response: Booking object
+   
+   - GET /bookings/payment-status - Kiểm tra trạng thái thanh toán
+     Query: paymentOrderId
+     Response: Payment status + booking details
+   
+   - PATCH /bookings/:id - Hủy đơn đặt bàn
+   
+   - Admin endpoints: GET /admin/bookings, POST, PUT, DELETE
+
+3. cart.go
+   Endpoints:
+   - GET /cart - Lấy giỏ hàng
+     Query: email
+     Response: Cart object
+   
+   - POST /cart/items - Thêm sản phẩm vào giỏ
+     Body: {email, drinkId, qty}
+   
+   - PUT /cart/items - Cập nhật quantity
+     Body: {email, drinkId, qty}
+   
+   - DELETE /cart/items - Xóa sản phẩm khỏi giỏ
+     Body: {email, drinkId}
+   
+   - POST /checkout - Thanh toán (Cart)
+
+4. payment.go
+   Endpoints:
+   - POST /api/payment/vnpay-ipn - VNPay IPN callback
+     Xác minh chữ ký, cập nhật trạng thái thanh toán
+   
+   - GET /api/payment/vnpay-ipn - VNPay callback (GET method)
+
+5. admin_auth.go
+   Middleware: RequireAdminAuth()
+   - Xác thực JWT token
+   - Kiểm tra role admin
+   - Lưu user info vào context
+   - Trả về lỗi 401 nếu không hợp lệ
+
+6. users.go
+   Endpoints:
+   - GET /users - Lấy danh sách người dùng
+   
+   - POST /auth/register - Đăng ký người dùng mới
+     Body: {name, email, password}
+     Validate: Email không trùng lặp, mật khẩu >= 8 ký tự
+     Hash mật khẩu với bcrypt
+   
+   - POST /auth/login - Đăng nhập
+     Body: {name, password} hoặc {email, password}
+     Response: {user, token, expiresAt}
+   
+   - POST /auth/request-verify - Yêu cầu token xác minh email
+     Body: {email}
+   
+   - POST /auth/verify - Xác minh email bằng token
+     Body: {token}
+   
+   - Admin endpoints: POST /admin/users, PUT /admin/users/:id, DELETE
+
+7. reco.go
+   Endpoints:
+   - POST /reco/from-features - Lấy gợi ý đồ uống
+     Body: {caffeine, temp, sweetness}
+     Response: Mảng drink được sắp xếp theo điểm gợi ý
+
+D. internal/services/
+───────────────────────
+
+1. token.go
+   Hàm:
+   - GenerateVerificationToken(email) → token, expiresAt
+     Tạo token xác minh email với HMAC-SHA256
+     Format: base64(email|timestamp|signature)
+   
+   - VerifyToken(token) → email, error
+     Xác thực signature và kiểm tra hết hạn
+   
+   - GenerateSessionToken(userID) → token, expiresAt
+     Tạo JWT token cho session (TTL: 30 days)
+   
+   - VerifySessionToken(token) → claims, error
+     Xác minh JWT token
+
+2. vnpay.go
+   Hàm:
+   - CreateVNPayURL(orderId, amount, orderInfo, ipAddr) → url, error
+     Tạo URL thanh toán VNPay với params
+   
+   - VerifyVNPaySignature(params, secureHash) → bool
+     Xác minh chữ ký VNPay response
+
+3. reco_score.go
+   Hàm:
+   - ScoreDrinks(drinks, caffeine, temp, sweetness) → []DrinkScore
+     Điểm số đồ uống dựa trên preference:
+     * Caffeine match: +1.0 hoặc x0.7
+     * Temperature match: +1.0 hoặc x0.7
+     * Sweetness: Tính độ khác biệt, score 0-1
+     * Kết hợp tất cả thành 1 score cuối cùng
+
+4. admin_seed.go
+   Hàm:
+   - EnsureAdminUser()
+     Tạo admin user mặc định từ env variables nếu chưa tồn tại
+     Env vars: ADMIN_NAME, ADMIN_EMAIL, ADMIN_PASSWORD
+
+E. internal/db/
+─────────────────
+
+mongo.go
+   Hàm:
+   - Init()
+     Kết nối MongoDB dùng driver
+     Sử dụng MONGO_URI và MONGO_DB từ .env
+     Log thông tin kết nối
+     Panic nếu kết nối thất bại
+
+F. internal/graph/
+────────────────────
+
+1. schema.graphql
+   Định nghĩa GraphQL types:
+   - EmotionFit: {calm, happy, stressed, sad, adventurous}
+   - Drink: All fields + emotionFit
+   - User: {_id, name, email, createdAt}
+   - Query: drinks, drink(id), users, bookings
+   - Mutation: createBooking, register, login, recommendFromFeatures
+
+2. resolver.go
+   Implement resolvers cho tất cả queries và mutations
+
+3. handler.go
+   HTTP handler cho GraphQL endpoint POST /graphql
+
+3.3 DEPENDENCIES (Go Packages)
+────────────────────────────────
+
+Core:
+- github.com/gin-gonic/gin v1.10.0        # Web framework
+- github.com/gin-contrib/cors v1.7.5      # CORS middleware
+- go.mongodb.org/mongo-driver v1.15.0     # MongoDB driver
+- golang.org/x/crypto v0.43.0             # Crypto utilities (bcrypt)
+
+Utilities:
+- github.com/joho/godotenv v1.5.1         # Load .env files
+
+================================================================================
+4. CHI TIẾT FRONTEND (VUE.JS)
+================================================================================
+
+4.1 CẤU TRÚC THƯ MỤC
+─────────────────────
+
+website/LeBlanc web/
+├── package.json               # Project metadata & dependencies
+├── vite.config.js             # Vite configuration
+├── jsconfig.json              # JavaScript config (path aliases)
+├── vercel.json                # Vercel deployment config (SPA rewrite)
+├── .env                       # Environment variables
+├── .env.local                 # Local env overrides
+├── index.html                 # HTML entry point
+├── yarn.lock / package-lock.json
+├── public/
+│   └── drinks/                # Static drink images
+├── src/
+│   ├── main.js                # Vue app entry point
+│   ├── App.vue                # Root component
+│   ├── App.css                # Global styles
+│   ├── api.js                 # Unified API wrapper (REST/GraphQL toggle)
+│   ├── email.js               # EmailJS configuration
+│   ├── api/
+│   │   ├── httpClient.js      # Axios instance + interceptors
+│   │   ├── auth.api.js        # Auth endpoints
+│   │   ├── drinks.api.js      # Drinks endpoints
+│   │   ├── bookings.api.js    # Bookings endpoints
+│   │   ├── cart.api.js        # Cart endpoints
+│   │   ├── users.api.js       # Users endpoints
+│   │   ├── admin.api.js       # Admin endpoints
+│   │   ├── recommendation.api.js  # Recommendation endpoints
+│   │   ├── bookingAddons.api.js   # Booking addons
+│   │   ├── graphql.client.js  # GraphQL client & queries/mutations
+│   │   └── index.js           # API export
+│   ├── assets/
+│   │   ├── main.css           # Global CSS
+│   │   ├── dark-logo.png      # Dark theme logo
+│   │   └── bright-logo.png    # Bright theme logo
+│   ├── components/
+│   │   ├── ConfirmDialog.vue  # Confirmation dialog
+│   │   └── admin/
+│   │       ├── ...admin components
+│   ├── composables/           # Vue composables (reusable logic)
+│   │   ├── useSessionAuth.js  # Authentication state management
+│   │   ├── useThemeState.js   # Theme (dark/light) management
+│   ├── config/
+│   │   └── ...config files
+│   ├── router/
+│   │   └── index.js           # Vue Router configuration
+│   ├── services/
+│   │   └── session.service.js # localStorage token management
+│   ├── stores/
+│   │   └── theme.store.js     # Pinia store (state management)
+│   └── views/
+│       ├── Home.vue           # Trang chủ
+│       ├── About.vue          # Trang About
+│       ├── Menu.vue           # Trang menu/danh sách đồ uống
+│       ├── Booking.vue        # Trang đặt bàn
+│       ├── BookingConfirmation.vue  # Xác nhận đặt bàn
+│       ├── PaymentResult.vue  # Kết quả thanh toán
+│       ├── MyOrders.vue       # Danh sách đơn hàng của tôi
+│       ├── BookingDetail.vue  # Chi tiết đơn hàng
+│       ├── Account.vue        # Trang tài khoản
+│       ├── Login.vue          # Trang đăng nhập
+│       ├── Register.vue       # Trang đăng ký
+│       ├── Verify.vue         # Trang xác minh email
+│       └── Admin.vue          # Trang quản trị viên
+
+4.2 MÔ TẢ CHI TIẾT CÁC FILE QUAN TRỌNG
+────────────────────────────────────────
+
+A. main.js
+──────────
+- Tạo Vue app instance
+- Cài đặt Pinia (state management)
+- Cài đặt Vue Router
+- Import Semantic UI CSS
+- Import global styles
+- Mount app vào #app element
+
+B. App.vue
+──────────
+Root component:
+- Header với navigation menu
+- Logo (responsive dark/light theme)
+- User account menu
+- Theme toggle (dark/light)
+- Logout functionality
+- Router outlet để render pages
+- Session management (lắng nghe storage events)
+
+C. src/router/index.js
+──────────────────────
+Routes:
+- / (home) → Home.vue
+- /about → About.vue
+- /menu → Menu.vue
+- /booking → Booking.vue
+  Redirect: /booking/addons → /booking, /cart → /booking
+- /booking/confirmation → BookingConfirmation.vue (requires auth)
+- /booking/payment-result → PaymentResult.vue (requires auth)
+- /orders → MyOrders.vue (requires auth)
+- /orders/:id → BookingDetail.vue (requires auth)
+- /account → Account.vue (requires auth)
+- /login → Login.vue
+- /register → Register.vue
+- /verify → Verify.vue
+- /admin* → Admin.vue (requires admin role)
+
+Meta fields:
+- requiresAuth: Yêu cầu người dùng đã đăng nhập
+- layout: Kiểu layout (plain cho không header/footer)
+
+D. src/api/
+────────────
+
+1. httpClient.js
+   - Tạo axios instance
+   - Base URL: import.meta.env.VITE_API_BASE
+   - Interceptor: Tự động thêm Authorization header nếu có token
+   - USE_GRAPHQL flag: Toggle giữa REST/GraphQL
+
+2. auth.api.js
+   - registerUserREST(payload) → POST /auth/register
+   - loginUserREST(payload) → POST /auth/login
+   - requestVerifyREST(payload) → POST /auth/request-verify
+   - verifyTokenREST(payload) → POST /auth/verify
+   - Hàm unified: registerUser, loginUser, requestVerify, verifyToken
+
+3. drinks.api.js
+   - getDrinksREST() → GET /drinks
+   - getDrinkREST(id) → GET /drinks/:id
+   - getDrinksGraphQL() → GraphQL query
+   - getDrinkGraphQL(id) → GraphQL query
+   - Hàm unified getDrinks(), getDrink() (toggle by USE_GRAPHQL)
+
+4. bookings.api.js
+   - getBookings() → GET /bookings
+   - getBooking(id) → GET /bookings/:id
+   - createBooking(payload) → POST /bookings
+   - cancelBooking(id) → PATCH /bookings/:id
+   - getBookingPaymentStatus(paymentOrderId) → GET /bookings/payment-status
+
+5. cart.api.js
+   - getCart(email) → GET /cart?email=...
+   - addCartItem(email, drinkId, qty) → POST /cart/items
+   - updateCartItem(email, drinkId, qty) → PUT /cart/items
+   - removeCartItem(email, drinkId) → DELETE /cart/items
+   - checkout(cartData) → POST /checkout
+
+6. admin.api.js
+   - getUsers() → GET /admin/users
+   - createUser(payload) → POST /admin/users
+   - updateUser(id, payload) → PUT /admin/users/:id
+   - deleteUser(id) → DELETE /admin/users/:id
+   - getBookings() → GET /admin/bookings
+   - Tương tự cho drinks, bookings, etc.
+
+7. recommendation.api.js
+   - getRecommendations(caffeine, temp, sweetness) 
+     → POST /reco/from-features
+
+8. graphql.client.js
+   - Tạo GraphQL request client
+   - Định nghĩa tất cả GraphQL queries & mutations
+   - Hàm wrapper: getDrinksGraphQL(), loginGraphQL(), etc.
+
+E. src/services/
+─────────────────
+
+session.service.js
+   - getStoredToken() → Lấy token từ localStorage
+   - saveToken(token) → Lưu token vào localStorage
+   - clearToken() → Xóa token
+   - TOKEN_KEY: Key dùng để lưu token
+   - USER_STORAGE_KEY: Key dùng để lưu user data
+
+F. src/composables/
+────────────────────
+
+1. useSessionAuth.js
+   State:
+   - session: User info + token
+   - isAuthenticated: Boolean
+   
+   Functions:
+   - getSession() → lấy session từ localStorage
+   - getSessionUser() → lấy user từ session
+   - isAdminUser(user) → kiểm tra admin role
+   - clearSessionUser() → logout
+   - saveSessionUser(user, token) → login
+   - ADMIN_HOME_PATH: /admin
+
+2. useThemeState.js
+   State:
+   - theme: 'day' hoặc 'night'
+   
+   Functions:
+   - toggleTheme() → chuyển đổi theme
+   - provideThemeState() → provide cho tất cả children
+
+G. src/views/
+───────────────
+
+1. Home.vue
+   - Trang chủ
+   - Hero section với introduction
+   - Quick links đến Menu, Booking, etc.
+   - Showcase sản phẩm
+   - Links/CTA buttons
+
+2. Menu.vue
+   - Hiển thị danh sách đồ uống từ API
+   - Filter/search functionality
+   - Sort options
+   - Drink card với price, tags, image
+   - Click để xem chi tiết
+
+3. Booking.vue
+   - Form đặt bàn: name, email, phone, time, guests, items
+   - Date/time picker
+   - Thêm đồ uống vào đơn
+   - Calculate total price
+   - Submit → gửi POST /bookings
+   - Redirect đến BookingConfirmation
+
+4. BookingConfirmation.vue
+   - Hiển thị thông tin đơn đặt bàn
+   - Chi tiết sản phẩm + price
+   - Nút chuyển sang thanh toán
+   - VNPay payment button
+
+5. PaymentResult.vue
+   - Hiển thị kết quả thanh toán
+   - Success/Failed state
+   - Transaction details
+   - Links đến orders hoặc home
+
+6. MyOrders.vue
+   - Danh sách tất cả đơn đặt bàn của user
+   - Status badge (pending, confirmed, cancelled, paid)
+   - Links đến chi tiết từng đơn
+   - Filter/sort options
+
+7. BookingDetail.vue
+   - Chi tiết 1 đơn đặt bàn
+   - Tất cả thông tin: customer, items, status, payment
+   - Cancel booking button (nếu có thể)
+   - Payment details nếu có
+
+8. Login.vue
+   - Form: email/name + password
+   - Submit → POST /auth/login
+   - Lưu token, redirect đến home
+   - Link đến Register
+
+9. Register.vue
+   - Form: name + email + password + confirm password
+   - Password validation
+   - Submit → POST /auth/register
+   - Send verification email
+   - Redirect đến Verify page
+
+10. Verify.vue
+    - Email verification
+    - Input token hoặc request verify link
+    - Submit → POST /auth/verify
+    - Redirect đến home hoặc dashboard
+
+11. Account.vue
+    - Hiển thị user profile
+    - Edit name, email
+    - Change password
+    - Delete account (nếu có)
+
+12. Admin.vue
+    - Admin dashboard
+    - Tabs: Users, Bookings, Drinks, Orders
+    - CRUD operations cho mỗi tab
+    - Tables hiển thị dữ liệu
+    - Form để create/edit/delete
+
+H. src/components/
+────────────────────
+
+admin/ folder:
+- Components dùng riêng cho Admin page
+- DrinkTable.vue, UserTable.vue, etc.
+- DrinkForm.vue, UserForm.vue, etc.
+
+ConfirmDialog.vue:
+- Reusable confirmation dialog
+- Props: title, message, onConfirm, onCancel
+- Dùng cho delete actions
+
+4.3 DEPENDENCIES (NPM Packages)
+────────────────────────────────
+
+Core:
+- vue@^3.5.22                 # Vue.js framework
+- vue-router@^4.4.5           # Routing
+- pinia@^3.0.4                # State management
+- vite@^7.1.11                # Build tool
+
+API/Data:
+- axios@^1.7.2                # HTTP client
+- graphql@^16.12.0            # GraphQL client
+- graphql-request@^7.3.4      # GraphQL request library
+
+UI:
+- semantic-ui-css@^2.5.0      # CSS framework
+
+Email:
+- @emailjs/browser@^4.4.1     # EmailJS client
+
+Other:
+- vercel@^48.11.1             # Vercel CLI
+
+Dev Dependencies:
+- @vitejs/plugin-vue@^6.0.1   # Vue plugin for Vite
+- vite-plugin-vue-devtools@^8.0.3  # Dev tools
+
+4.4 ENVIRONMENT VARIABLES (Frontend)
+──────────────────────────────────────
+
+VITE_API_BASE=http://localhost:4000
+  Backend API base URL
+
+VITE_ADMIN_EMAIL=datnqgch220422@fpt.edu.vn
+  Admin email (dùng cho verification, contact)
+
+VITE_EMAILJS_SERVICE_ID=service_v5gtx7b
+  EmailJS service ID
+
+VITE_EMAILJS_TEMPLATE_ID=template_bj18kel
+  EmailJS template ID cho verify email
+
+VITE_EMAILJS_PUBLIC_KEY=uJ3HFu8B19x31Vsg7
+  EmailJS public key
+
+VITE_EMAILJS_BOOKING_TEMPLATE_ID=template_soe2qpi
+  EmailJS template ID cho booking confirmation
+
+VITE_USE_GRAPHQL=false
+  Toggle giữa REST (false) và GraphQL (true) API
+
+================================================================================
+5. DATABASE SCHEMA (MONGODB)
+================================================================================
+
+5.1 COLLECTIONS
+────────────────
+
+A. USERS COLLECTION
+────────────────────
+
+Database: leblanc (configured in MONGO_DB env var)
+Collection: users
+
+Unique Indexes:
+- nameLower (unique, sparse)
+- emailLower (unique, sparse)
+
+Document structure:
+{
+  "_id": ObjectId("..."),
+  "name": "John Doe",
+  "nameLower": "john doe",
+  "email": "john@example.com",
+  "emailLower": "john@example.com",
+  "role": "admin",                    // optional, empty for normal user
+  "verified": true,                   // email verification status
+  "passwordHash": "$2a$10$...",       // bcrypt hash
+  "createdAt": ISODate("2025-01-01T10:00:00Z")
+}
+
+B. DRINKS COLLECTION
+──────────────────────
+
+Collection: drinks
+
+Document structure:
+{
+  "_id": ObjectId("..."),
+  "name": "Espresso",
+  "price": 35000,                    // VND
+  "stock": 50,
+  "available": true,
+  "tags": ["hot", "coffee", "strong"],
+  "caffeine": "high",                // low | med | high
+  "temp": "hot",                     // hot | iced | either
+  "sweetness": 2,                    // 0-10
+  "colorTone": "warm",               // warm | cool | neutral
+  "image": "https://...",            // URL
+  "desc": "Strong black coffee"
+}
+
+C. BOOKINGS COLLECTION
+────────────────────────
+
+Collection: bookings
+
+Document structure:
+{
+  "_id": ObjectId("..."),
+  "email": "customer@example.com",
+  "name": "John Doe",
+  "phone": "0912345678",
+  "time": ISODate("2025-05-20T18:00:00Z"),
+  "guests": 4,
+  "items": [
+    {
+      "drinkId": ObjectId("..."),
+      "qty": 2,
+      "options": { "size": "large" }    // flexible object
+    }
+  ],
+  "status": "confirmed",              // pending | confirmed | cancelled
+  "channel": "web",                   // web | admin | phone
+  "paymentMethod": "vnpay",           // cash | vnpay
+  "paymentStatus": "completed",       // pending | completed | failed
+  "paymentAmount": 350000,            // VND
+  "paymentOrderId": "ORDER_123",
+  "paymentTransId": "TRANS_123",
+  "paymentMessage": "Payment successful"
+}
+
+D. CARTS COLLECTION
+─────────────────────
+
+Collection: carts
+
+Document structure:
+{
+  "_id": ObjectId("..."),
+  "email": "customer@example.com",
+  "items": [
+    {
+      "drinkId": ObjectId("..."),
+      "qty": 2,
+      "options": { "size": "large", "sugar": "50%" }
+    }
+  ]
+}
+
+E. BOOKINGADDONS COLLECTION
+──────────────────────────────
+
+Collection: bookingaddons
+
+Similar to bookings, dùng cho booking + add-ons system
+
+5.2 QUERIES VÀ INDEXES
+─────────────────────
+
+Common queries sẽ được optimize bởi các indexes:
+
+- Find user by email: db.users.find({emailLower: "..."})
+- Find user by name: db.users.find({nameLower: /.../, i})
+- Find bookings by email: db.bookings.find({email: "..."})
+- Find bookings by status: db.bookings.find({status: "confirmed"})
+- Find cart by email: db.carts.find({email: "..."})
+- Find drink by name: db.drinks.find({name: /.../, i})
+
+================================================================================
+6. API ENDPOINTS REFERENCE
+================================================================================
+
+6.1 REST API ENDPOINTS
+───────────────────────
+
+A. HEALTH & INFO
+─────────────────
+GET /
+Response: {"msg": "LeBlanc Go API with REST & GraphQL."}
+
+B. DRINKS
+───────────
+GET /drinks
+Query params: q (search), available (boolean), stock (positive/zero/in/out)
+Response: Array<Drink>
+Example: GET /drinks?q=coffee&available=true
+
+POST /admin/drinks (requires admin auth)
+Body: {name, price, stock, available, tags, caffeine, temp, sweetness, colorTone, image, desc}
+Response: {drink with _id}
+
+PUT /admin/drinks/:id (requires admin auth)
+Body: Updated drink fields
+Response: {modifiedCount}
+
+DELETE /admin/drinks/:id (requires admin auth)
+Response: {deletedCount}
+
+C. BOOKINGS
+────────────
+GET /bookings
+Response: Array<Booking>
+
+POST /bookings
+Body: {email, name, phone, time, guests, items[], channel}
+Response: {_id, ...booking}
+
+GET /bookings/payment-status
+Query: paymentOrderId
+Response: {paymentStatus, status, items[], bookingId, ...}
+
+PATCH /bookings/:id
+Body: {status}
+Response: {modifiedCount}
+
+Admin endpoints:
+GET /admin/bookings
+POST /admin/bookings
+PUT /admin/bookings/:id
+DELETE /admin/bookings/:id
+
+D. CART
+─────────
+GET /cart
+Query: email
+Response: {email, items[]}
+
+POST /cart/items
+Body: {email, drinkId, qty}
+Response: {email, items[]}
+
+PUT /cart/items
+Body: {email, drinkId, qty}
+Response: {email, items[]}
+
+DELETE /cart/items
+Body: {email, drinkId}
+Response: {email, items[]}
+
+POST /checkout
+Body: {email, items[], paymentMethod, ...}
+Response: Payment URL hoặc success response
+
+E. AUTHENTICATION
+────────────────
+POST /auth/register
+Body: {name, email, password}
+Response: {user{_id, name, email}, token, expiresAt} hoặc error
+
+POST /auth/login
+Body: {name or email, password}
+Response: {user{_id, name, email}, token, expiresAt} hoặc error
+
+POST /auth/request-verify
+Body: {email}
+Response: {ok, message}
+
+POST /auth/verify
+Body: {token}
+Response: {ok, message, user{...}}
+
+F. PAYMENT
+───────────
+GET /api/payment/vnpay-ipn
+Query: vnp_* params
+Process: Xác minh signature, cập nhật booking status
+
+POST /api/payment/vnpay-ipn
+Body: VNPay IPN callback params
+Response: {RspCode, Message}
+
+G. USERS
+──────────
+GET /users
+Response: Array<PublicUser>
+
+GET /admin/users (requires admin auth)
+Response: Array<User>
+
+POST /admin/users (requires admin auth)
+Body: {name, email, password, role}
+Response: {user with _id}
+
+PUT /admin/users/:id (requires admin auth)
+Body: Updated user fields
+Response: {modifiedCount}
+
+DELETE /admin/users/:id (requires admin auth)
+Response: {deletedCount}
+
+H. RECOMMENDATION
+────────────────
+POST /reco/from-features
+Body: {caffeine: "high", temp: "hot", sweetness: 5}
+Response: Array<{drinkId, score, drink details}>
+
+6.2 GRAPHQL ENDPOINT
+──────────────────────
+
+POST /graphql
+Content-Type: application/json
+Body: GraphQL query/mutation
+
+Example Query:
+```graphql
+query {
+  drinks {
+    _id
+    name
+    price
+    tags
+    caffeine
+    temp
+    sweetness
+  }
+}
+```
+
+Example Mutation:
+```graphql
+mutation {
+  createBooking(input: {
+    name: "John"
+    phone: "0912345678"
+    time: "2025-05-20T18:00:00Z"
+    items: [{drinkId: "...", qty: 1, options: "{}"}]
+    channel: "web"
+  }) {
+    _id
+    name
+    status
+  }
+}
+```
+
+6.3 AUTHENTICATION HEADERS
+────────────────────────────
+
+Admin endpoints require Bearer token:
+Authorization: Bearer <jwt_token>
+
+Token format:
+- JWT (HMAC-SHA256)
+- Contains: userID, role, expiresAt
+- TTL: 30 days
+
+Client implementation:
+1. Get token from /auth/login
+2. Store in localStorage
+3. Include in all subsequent requests:
+   Authorization: Bearer <token>
+4. Interceptor auto-adds if present
+
+================================================================================
+7. CÁC QUY TRÌNH VÀ LUỒNG DỮ LIỆU
+================================================================================
+
+7.1 LUỒNG ĐĂNG KÝ NGƯỜI DÙNG
+──────────────────────────────
+
+1. User vào trang Register.vue
+2. Nhập: Name, Email, Password
+3. Frontend validate:
+   - Password >= 8 ký tự
+   - Email format hợp lệ
+   - Confirm password match
+4. Frontend gửi: POST /auth/register
+5. Backend (users.go):
+   - Validate inputs
+   - Kiểm tra email không trùng lặp (query emailLower)
+   - Hash password với bcrypt (10 rounds)
+   - Insert vào MongoDB users collection
+   - Return {user, token, expiresAt}
+6. Frontend:
+   - Lưu token vào localStorage
+   - Save user vào sessionStorage
+   - Redirect đến Verify.vue
+7. Frontend gửi verify request:
+   - POST /auth/request-verify {email}
+   - Backend tạo verification token (HMAC-SHA256)
+   - Gửi token qua EmailJS
+   - Email được gửi đến user email
+8. User click link trong email
+9. Frontend gửi: POST /auth/verify {token}
+10. Backend verify token signature & expiry
+11. Update user.verified = true
+12. Redirect user đến Home.vue
+
+7.2 LUỒNG ĐẶT BÀN VÀ THANH TOÁN
+─────────────────────────────────
+
+1. User vào trang Booking.vue
+2. Nhập thông tin:
+   - Họ tên, email, số điện thoại
+   - Chọn thời gian, số khách
+   - Thêm đồ uống vào đơn
+3. Frontend validate, tính tổng tiền
+4. User click "Đặt bàn"
+5. Frontend gửi: POST /bookings
+   Body: {email, name, phone, time, guests, items[], channel: "web"}
+6. Backend (bookings.go):
+   - Validate inputs
+   - Kiểm tra stock đồ uống
+   - Insert vào MongoDB bookings collection
+   - Gửi confirmation email qua EmailJS
+   - Return booking info + paymentOrderId
+7. Frontend lưu booking vào temp storage
+8. Redirect đến BookingConfirmation.vue
+9. Hiển thị thông tin đơn
+10. User click "Thanh toán"
+11. Frontend gọi CreateVNPayURL (backend service)
+    - POST /api/payment/create-vnpay-url
+    - Params: orderId, amount, orderInfo, ipAddr
+12. Backend (vnpay.go):
+    - Build VNPay URL với tất cả params
+    - Tạo signature: HMAC-SHA512(params, secret)
+    - Return VNPay payment URL
+13. Frontend redirect user đến VNPay payment page
+14. User thanh toán trên VNPay
+15. VNPay callback:
+    POST /api/payment/vnpay-ipn (IPN - Instant Payment Notification)
+    Params: vnp_ResponseCode, vnp_TransactionNo, vnp_OrderInfo, vnp_SecureHash
+16. Backend (payment.go):
+    - Verify signature: VerifyVNPaySignature()
+    - Extract orderID, responseCode
+    - Query bookings collection by paymentOrderId
+    - Update payment status
+    - Return {RspCode: "00", Message: "Success"}
+17. VNPay redirect user đến return URL
+18. Frontend lấy paymentOrderId từ query params
+19. Gửi: GET /bookings/payment-status?paymentOrderId=...
+20. Backend return payment status
+21. Frontend display PaymentResult.vue:
+    - Success: Hiển thị confirmation, buttons
+    - Failed: Retry payment hoặc home
+
+7.3 LUỒNG ADMIN QUẢN LÝ
+─────────────────────────
+
+1. Admin đăng nhập
+2. Frontend: POST /auth/login {name/email, password}
+3. Backend check role = "admin"
+4. Return token với role
+5. Frontend redirect đến /admin
+6. Yêu cầu admin token từ middleware
+7. Admin.vue load data:
+   - GET /admin/users
+   - GET /admin/bookings
+   - GET /admin/drinks
+8. Display tables
+9. Admin click "Add New":
+   - Show form
+   - Submit: POST /admin/[resource]
+   - Backend create với validation
+   - Frontend refetch list
+10. Admin click "Edit":
+    - Populate form với hiện tại data
+    - Submit: PUT /admin/[resource]/:id
+    - Backend update
+    - Frontend refetch
+11. Admin click "Delete":
+    - Show confirm dialog
+    - Click confirm: DELETE /admin/[resource]/:id
+    - Backend delete
+    - Frontend refetch
+
+7.4 LUỒNG RECOMMENDATION
+──────────────────────────
+
+1. User chọn preference (caffeine, temp, sweetness) trên Menu.vue
+2. Frontend: POST /reco/from-features
+   Body: {caffeine: "high", temp: "iced", sweetness: 7}
+3. Backend (reco.go):
+   - Get tất cả drinks từ database
+   - Call services.ScoreDrinks()
+   - Tính score cho mỗi drink:
+     * Base score = 1.0
+     * If caffeine match: score *= 0.7 (không match)
+     * If temp match: score *= 0.7 (không match)
+     * Sweetness diff: score *= (0.5 + 0.5*similarity)
+     * Combine tất cả
+   - Sort by score descending
+   - Return top recommendations
+4. Frontend display recommended drinks highlighted
+
+================================================================================
+8. CÁC CÔNG NGHỆ & THƯ VIỆN SỬ DỤNG
+================================================================================
+
+8.1 BACKEND TECHNOLOGIES
+─────────────────────────
+
+Language: Go (Golang) 1.24+
+Web Framework: Gin v1.10.0
+  - High performance HTTP web framework
+  - Middleware support (CORS, Auth)
+  - Routing, JSON binding
+
+Database: MongoDB
+  - NoSQL document database
+  - Collections: users, drinks, bookings, carts
+  - Indexes: unique on email, name
+
+Authentication:
+  - bcrypt: Password hashing
+  - HMAC-SHA256: Email verification tokens
+  - JWT: Session tokens
+  - Custom middleware: RequireAdminAuth()
+
+Third-party APIs:
+  - VNPay: Payment gateway
+  - EmailJS: Email sending (via frontend)
+
+Server Hosting:
+  - Fly.io: Production server
+  - Docker: Containerization
+  - Port 8080 (internal), 8080 (external)
+
+8.2 FRONTEND TECHNOLOGIES
+──────────────────────────
+
+Framework: Vue 3 (Composition API)
+Build Tool: Vite 7.1.11
+  - Fast build & dev server
+  - HMR (Hot Module Replacement)
+  - Optimized production build
+
+State Management: Pinia 3.0.4
+  - Lightweight store management
+  - Replaces Vuex
+  - Stores: theme.store.js
+
+Routing: Vue Router 4.4.5
+  - Client-side routing
+  - 14+ routes defined
+  - Route meta: requiresAuth, layout
+
+HTTP Client: Axios 1.7.2
+  - Request/response interceptors
+  - Auto token injection
+  - Error handling
+
+API Integration:
+  - REST API: Direct via Axios
+  - GraphQL: graphql-request 7.3.4
+  - Toggle via VITE_USE_GRAPHQL env
+
+UI Framework: Semantic UI CSS 2.5.0
+  - CSS framework (no JavaScript)
+  - Responsive grid system
+  - Pre-built components
+
+Email: EmailJS 4.4.1
+  - Send emails from frontend
+  - Templates: Verification, Booking confirmation
+  - No backend email service needed
+
+Styling:
+  - CSS3 (Flexbox, Grid)
+  - Responsive design
+  - Dark/Light theme support
+
+Storage:
+  - localStorage: Persist token, user
+  - sessionStorage: Temp booking data
+
+8.3 DEVOPS & DEPLOYMENT
+─────────────────────────
+
+Backend (Go Server):
+  - Fly.io container platform
+  - Dockerfile: Multi-stage build
+  - fly.toml: Configuration
+  - Environment secrets: MONGO_URI, ADMIN_*, EMAIL_*
+  - Monitoring: Fly.io dashboard
+
+Frontend (Vue App):
+  - Vercel platform
+  - SPA rewrite: vercel.json
+  - Automatic deployments từ git
+  - Environment variables: VITE_API_BASE, etc.
+
+Database:
+  - MongoDB Atlas (cloud hosted)
+  - Connection string: MONGO_URI
+  - Database name: MONGO_DB (from env)
+
+================================================================================
+9. CÁC BIẾN MÔI TRƯỜNG
+================================================================================
+
+9.1 BACKEND .env (server/.env)
+────────────────────────────────
+
+MONGO_URI=mongodb://127.0.0.1:27017
+  MongoDB connection string
+  Local: mongodb://127.0.0.1:27017
+  Atlas: mongodb+srv://user:pass@cluster.mongodb.net
+
+MONGO_DB=leblanc
+  Database name trong MongoDB
+
+ADMIN_NAME=Admin User
+  Default admin account name
+
+ADMIN_EMAIL=admin@example.com
+  Default admin email
+
+ADMIN_PASSWORD=password123
+  Default admin password (nên dùng strong password)
+
+FRONTEND_VERIFY_URL=https://le-blanc-web.vercel.app/verify
+  Frontend URL để verify email
+  Format: {frontend_domain}/verify?token={token}
+
+EMAIL_REQUIRE_MX=true
+  Verify MX record khi kiểm tra email hợp lệ
+
+VNPAY_TMN_CODE=...
+  VNPay terminal code (sandbox hoặc production)
+
+VNPAY_HASH_SECRET=...
+  VNPay hash secret (security key)
+
+VNPAY_URL=https://sandbox.vnpayment.vn/paygate/pay
+  VNPay payment gateway URL
+
+VNPAY_RETURN_URL=https://le-blanc-web.vercel.app/booking/payment-result
+  URL để redirect sau khi thanh toán
+
+PORT=4000
+  Server port (mặc định 4000, Fly.io dùng 8080)
+
+9.2 FRONTEND .env (website/LeBlanc web/.env)
+───────────────────────────────────────────────
+
+VITE_API_BASE=http://localhost:4000
+  Backend API base URL
+  Local: http://localhost:4000
+  Production: https://server-wandering-tree-4946.fly.dev
+
+VITE_ADMIN_EMAIL=admin@example.com
+  Admin email (dùng cho contact)
+
+VITE_EMAILJS_SERVICE_ID=service_xxx
+  EmailJS service ID
+
+VITE_EMAILJS_TEMPLATE_ID=template_xxx
+  EmailJS template ID (verification email)
+
+VITE_EMAILJS_PUBLIC_KEY=public_key_xxx
+  EmailJS public key (từ dashboard)
+
+VITE_EMAILJS_BOOKING_TEMPLATE_ID=template_yyy
+  EmailJS template ID (booking confirmation)
+
+VITE_USE_GRAPHQL=false
+  Toggle API mode: false = REST, true = GraphQL
+
+================================================================================
+10. CÁCH CHẠY DỰ ÁN
+================================================================================
+
+10.1 CHUẨN BỊ
+───────────────
+
+Prerequisites:
+1. Go 1.24+ cài đặt
+2. Node.js 20+ cài đặt (npm/yarn)
+3. MongoDB running:
+   - Local: mongod chạy trên 127.0.0.1:27017
+   - Hoặc Atlas: Có connection string
+
+10.2 CHẠY BACKEND
+─────────────────
+
+1. Điều hướng đến thư mục server:
+   cd server
+
+2. Copy file .env.example thành .env (nếu cần):
+   cp .env.example .env
+
+3. Edit .env với các giá trị phù hợp:
+   MONGO_URI=mongodb://127.0.0.1:27017
+   MONGO_DB=leblanc
+   ADMIN_NAME=Admin
+   ADMIN_EMAIL=admin@example.com
+   ADMIN_PASSWORD=strongpassword
+   PORT=4000
+
+4. Chạy seeder (tạo admin user, sample drinks):
+   go run ./cmd/seed
+
+5. Chạy server:
+   go run .
+
+   Output:
+   Mongo connected: mongodb://127.0.0.1:27017 db: leblanc
+   Server listening on http://localhost:4000
+
+6. Test health check:
+   curl http://localhost:4000
+   Response: {"msg": "LeBlanc Go API with REST & GraphQL."}
+
+7. GraphQL: http://localhost:4000/graphql
+
+10.3 CHẠY FRONTEND
+────────────────────
+
+1. Điều hướng đến frontend:
+   cd website/LeBlanc\ web
+
+2. Install dependencies:
+   npm install
+   # hoặc nếu dùng yarn:
+   yarn install
+
+3. Tạo/chỉnh sửa .env:
+   VITE_API_BASE=http://localhost:4000
+   VITE_ADMIN_EMAIL=admin@example.com
+   VITE_EMAILJS_SERVICE_ID=service_v5gtx7b
+   VITE_EMAILJS_TEMPLATE_ID=template_bj18kel
+   VITE_EMAILJS_PUBLIC_KEY=uJ3HFu8B19x31Vsg7
+   VITE_EMAILJS_BOOKING_TEMPLATE_ID=template_soe2qpi
+   VITE_USE_GRAPHQL=false
+
+4. Chạy dev server:
+   npm run dev
+
+   Output:
+   Local:   http://localhost:5173/
+   Press 'o' to open in browser
+
+5. Truy cập: http://localhost:5173
+
+6. Test routes:
+   - Home: /
+   - Menu: /menu
+   - Booking: /booking
+   - Login: /login
+   - Register: /register
+   - Admin: /admin (sau khi đăng nhập admin)
+
+10.4 PRODUCTION BUILD
+───────────────────────
+
+Frontend build:
+cd website/LeBlanc\ web
+npm run build
+
+Output: dist/ folder
+
+Deploy to Vercel:
+vercel --prod
+
+Backend deploy (Fly.io):
+flyctl deploy --config fly.toml --dockerfile Dockerfile
+
+(Phải set secrets trước:
+ flyctl secrets set MONGO_URI="..." ADMIN_NAME="..." etc.
+)
+
+10.5 TESTING
+─────────────
+
+API Test (cURL):
+curl -X GET http://localhost:4000/drinks
+curl -X POST http://localhost:4000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Test","email":"test@example.com","password":"password123"}'
+
+GraphQL Query:
+curl -X POST http://localhost:4000/graphql \
+  -H "Content-Type: application/json" \
+  -d '{"query":"{ drinks { _id name price } }"}'
+
+================================================================================
+11. TROUBLESHOOTING & FAQ
+================================================================================
+
+Q1: MongoDB Connection Error
+A: - Kiểm tra MongoDB đang chạy
+   - Xác nhận MONGO_URI chính xác
+   - Nếu dùng Atlas, check firewall/whitelist IP
+
+Q2: CORS Error trong frontend
+A: - Backend CORS config có include frontend URL không?
+   - Check main.go AllowOrigins
+
+Q3: Token không được lưu sau login
+A: - Check browser localStorage enabled
+   - Verify token key: "leblanc_token"
+   - Check token format (Bearer xxxx)
+
+Q4: Email không gửi được
+A: - EmailJS credentials chính xác?
+   - Check VITE_EMAILJS_* env vars
+   - Verify template IDs in EmailJS dashboard
+
+Q5: VNPay payment không callback
+A: - VNPAY_RETURN_URL chính xác?
+   - IPN_URL configured trong VNPay dashboard?
+   - Verify signature đúng?
+
+Q6: Admin cannot create drink
+A: - Token hợp lệ?
+   - User role = "admin"?
+   - Authorization header format: "Bearer {token}"
+
+Q7: Recommendation endpoint không hoạt động
+A: - POST params chính xác?
+   - caffeine, temp, sweetness đúng format?
+   - Có drinks trong database?
+
+================================================================================
+12. CẤU TRÚC FILE TREE HOÀN CHỈNH
+================================================================================
+
+leblanc/
+├── .git/                        # Git repository
+├── .vscode/                     # VS Code settings
+├── README.md                    # Project overview
+├── API_INTEGRATION.md           # API documentation
+├── INTEGRATION_SUMMARY.md       # Integration notes
+├── LEBLANC_PROJECT_DOCUMENTATION.txt  # This file
+│
+├── server/                      # Go Backend
+│   ├── main.go                  # Entry point
+│   ├── go.mod                   # Dependencies
+│   ├── go.sum                   # Lock file
+│   ├── .env                     # Environment variables
+│   ├── fly.toml                 # Fly.io config
+│   ├── Dockerfile               # Docker image
+│   ├── gqlgen.yml               # GraphQL codegen
+│   ├── app.exe                  # Compiled (local)
+│   │
+│   ├── cmd/                     # Commands
+│   │   └── seed/
+│   │       └── main.go          # Database seeder
+│   │
+│   └── internal/                # Internal packages
+│       ├── db/
+│       │   └── mongo.go
+│       ├── models/
+│       │   ├── user.go
+│       │   ├── drink.go
+│       │   ├── booking.go
+│       │   ├── booking_status.go
+│       │   ├── cart.go
+│       │   └── payment_status.go
+│       ├── handlers/
+│       │   ├── users.go
+│       │   ├── drinks.go
+│       │   ├── bookings.go
+│       │   ├── cart.go
+│       │   ├── payment.go
+│       │   ├── admin_auth.go
+│       │   ├── admin_crud.go
+│       │   ├── reco.go
+│       │   └── http_response.go
+│       ├── services/
+│       │   ├── token.go
+│       │   ├── vnpay.go
+│       │   ├── reco_score.go
+│       │   └── admin_seed.go
+│       ├── graph/
+│       │   ├── schema.graphql
+│       │   ├── handler.go
+│       │   └── resolver.go
+│       └── utils/
+│           └── response.go
+│
+├── website/                     # Frontend
+│   └── LeBlanc web/
+│       ├── package.json
+│       ├── vite.config.js
+│       ├── jsconfig.json
+│       ├── vercel.json
+│       ├── .env
+│       ├── .env.local
+│       ├── index.html
+│       ├── yarn.lock
+│       │
+│       ├── public/
+│       │   └── drinks/          # Drink images
+│       │
+│       └── src/
+│           ├── main.js          # App entry
+│           ├── App.vue          # Root component
+│           ├── App.css          # Global styles
+│           ├── api.js           # Unified API
+│           ├── email.js         # EmailJS config
+│           │
+│           ├── api/             # API modules
+│           │   ├── httpClient.js
+│           │   ├── auth.api.js
+│           │   ├── drinks.api.js
+│           │   ├── bookings.api.js
+│           │   ├── cart.api.js
+│           │   ├── users.api.js
+│           │   ├── admin.api.js
+│           │   ├── recommendation.api.js
+│           │   ├── bookingAddons.api.js
+│           │   ├── graphql.client.js
+│           │   └── index.js
+│           │
+│           ├── assets/          # Static assets
+│           │   ├── main.css
+│           │   ├── dark-logo.png
+│           │   └── bright-logo.png
+│           │
+│           ├── components/      # Vue components
+│           │   ├── ConfirmDialog.vue
+│           │   └── admin/
+│           │
+│           ├── composables/     # Reusable logic
+│           │   ├── useSessionAuth.js
+│           │   └── useThemeState.js
+│           │
+│           ├── config/          # Config files
+│           │
+│           ├── router/          # Routing
+│           │   └── index.js
+│           │
+│           ├── services/        # Service layer
+│           │   └── session.service.js
+│           │
+│           ├── stores/          # Pinia stores
+│           │   └── theme.store.js
+│           │
+│           └── views/           # Page components
+│               ├── Home.vue
+│               ├── About.vue
+│               ├── Menu.vue
+│               ├── Booking.vue
+│               ├── BookingConfirmation.vue
+│               ├── PaymentResult.vue
+│               ├── MyOrders.vue
+│               ├── BookingDetail.vue
+│               ├── Account.vue
+│               ├── Login.vue
+│               ├── Register.vue
+│               ├── Verify.vue
+│               └── Admin.vue
+
+================================================================================
+13. SUMMARY & QUICK REFERENCE
+================================================================================
+
+PROJECT NAME: LeBlanc (Café/Restaurant Booking & Ordering System)
+
+TECH STACK:
+- Backend: Go + Gin + MongoDB + GraphQL
+- Frontend: Vue 3 + Vite + Pinia + Semantic UI
+- APIs: REST + GraphQL (toggle via env)
+- Payment: VNPay integration
+- Email: EmailJS integration
+- Hosting: Fly.io (backend), Vercel (frontend)
+
+KEY FEATURES:
+✓ User registration & authentication (email verification)
+✓ Menu browsing & drink selection
+✓ Table booking with time selection
+✓ Drink ordering system
+✓ VNPay payment integration
+✓ Booking confirmation emails
+✓ Drink recommendation engine (AI scoring)
+✓ Admin dashboard (CRUD operations)
+✓ Dark/Light theme support
+✓ Responsive design (mobile-friendly)
+
+PORT:
+- Backend: 4000 (local) / 8080 (Fly.io internal)
+- Frontend: 5173 (dev) / Vercel (production)
+- MongoDB: 27017 (default)
+
+KEY ENDPOINTS:
+- GET /drinks → List all drinks
+- POST /bookings → Create booking
+- POST /auth/login → User login
+- POST /auth/register → User registration
+- POST /checkout → Payment
+- POST /reco/from-features → Get recommendations
+- /admin/* → Admin operations (requires auth)
+- POST /graphql → GraphQL endpoint
+
+DATABASE:
+- MongoDB collections: users, drinks, bookings, carts, bookingaddons
+- Indexes: users(emailLower, nameLower) - unique
+
+RUN LOCALLY:
+1. Backend: cd server && go run main.go
+2. Frontend: cd website/LeBlanc\ web && npm run dev
+3. Access: http://localhost:5173
+
+DEPLOY:
+1. Backend: flyctl deploy --config server/fly.toml
+2. Frontend: vercel --prod
+
+================================================================================
+                              END OF DOCUMENTATION
+================================================================================

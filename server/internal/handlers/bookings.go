@@ -186,3 +186,59 @@ func CreateBooking(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"ok": true, "id": res.InsertedID})
 }
+
+// CancelBooking allows a user to cancel their booking by id.
+// Expects JSON body { "email": "user@example.com" } to verify ownership.
+func CancelBooking(c *gin.Context) {
+	idParam := strings.TrimSpace(c.Param("id"))
+	if idParam == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "booking id is required"})
+		return
+	}
+
+	// attempt to parse as ObjectID
+	oid, err := primitive.ObjectIDFromHex(idParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid booking id"})
+		return
+	}
+
+	var payload struct{
+		Email string `json:"email"`
+	}
+	if err := c.BindJSON(&payload); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var booking models.Booking
+	if err := db.DB.Collection("bookings").FindOne(ctx, bson.M{"_id": oid}).Decode(&booking); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "booking not found"})
+		return
+	}
+
+	// simple ownership check: email in body must match booking email
+	if strings.TrimSpace(strings.ToLower(payload.Email)) != strings.TrimSpace(strings.ToLower(booking.Email)) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "email does not match booking owner"})
+		return
+	}
+
+	// Only allow cancel if not already cancelled or completed
+	status := strings.ToLower(booking.Status)
+	if status == "cancelled" || status == "completed" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "booking cannot be cancelled"})
+		return
+	}
+
+	// perform update
+	_, err = db.DB.Collection("bookings").UpdateOne(ctx, bson.M{"_id": oid}, bson.M{"$set": bson.M{"status": "cancelled"}})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ok": true, "status": "cancelled"})
+}

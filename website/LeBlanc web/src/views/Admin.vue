@@ -15,6 +15,7 @@ import {
   updateAdminUser,
 } from "@/api";
 import { useThemeState } from "@/composables/useThemeState";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 const { theme } = useThemeState();
 
@@ -93,6 +94,47 @@ const feedback = reactive({
   type: "",
   text: "",
 });
+
+const confirmDialog = reactive({
+  open: false,
+  title: "Confirm action",
+  message: "",
+  confirmText: "Confirm",
+  pending: false,
+});
+
+let confirmResolver = null;
+
+// Detail view state
+const detailView = reactive({
+  open: false,
+  type: null, // "user", "booking", or "drink"
+  item: null,
+});
+
+const closeDetailView = () => {
+  detailView.open = false;
+  detailView.type = null;
+  detailView.item = null;
+};
+
+const openUserDetail = (user) => {
+  detailView.type = "user";
+  detailView.item = user;
+  detailView.open = true;
+};
+
+const openBookingDetail = (booking) => {
+  detailView.type = "booking";
+  detailView.item = booking;
+  detailView.open = true;
+};
+
+const openDrinkDetail = (drink) => {
+  detailView.type = "drink";
+  detailView.item = drink;
+  detailView.open = true;
+};
 
 const createEmptyUserForm = () => ({
   _id: "",
@@ -191,6 +233,33 @@ const setFeedback = (type, text) => {
 const clearFeedback = () => {
   feedback.type = "";
   feedback.text = "";
+};
+
+const askConfirm = ({ title, message, confirmText = "Confirm" }) =>
+  new Promise((resolve) => {
+    confirmDialog.title = title || "Confirm action";
+    confirmDialog.message = message || "Are you sure?";
+    confirmDialog.confirmText = confirmText;
+    confirmDialog.pending = false;
+    confirmDialog.open = true;
+    confirmResolver = resolve;
+  });
+
+const closeConfirmDialog = () => {
+  if (confirmDialog.pending) return;
+  confirmDialog.open = false;
+  if (confirmResolver) {
+    confirmResolver(false);
+    confirmResolver = null;
+  }
+};
+
+const submitConfirmDialog = () => {
+  confirmDialog.open = false;
+  if (confirmResolver) {
+    confirmResolver(true);
+    confirmResolver = null;
+  }
 };
 
 const getErrorMessage = (err, fallback) =>
@@ -436,7 +505,12 @@ const submitUser = async () => {
 };
 
 const removeUser = async (user) => {
-  if (!window.confirm(`Delete user "${user.name}"?`)) return;
+  const confirmed = await askConfirm({
+    title: "Delete user",
+    message: `Delete user "${user.name}"?`,
+    confirmText: "Delete",
+  });
+  if (!confirmed) return;
   clearFeedback();
   sectionError.users = "";
   try {
@@ -567,7 +641,12 @@ const submitBooking = async () => {
 };
 
 const removeBooking = async (booking) => {
-  if (!window.confirm(`Delete booking for "${booking.name}"?`)) return;
+  const confirmed = await askConfirm({
+    title: "Delete booking",
+    message: `Delete booking for "${booking.name}"?`,
+    confirmText: "Delete",
+  });
+  if (!confirmed) return;
   clearFeedback();
   sectionError.bookings = "";
   try {
@@ -655,7 +734,12 @@ const submitDrink = async () => {
 };
 
 const removeDrink = async (drink) => {
-  if (!window.confirm(`Delete product "${drink.name}"?`)) return;
+  const confirmed = await askConfirm({
+    title: "Delete product",
+    message: `Delete product "${drink.name}"?`,
+    confirmText: "Delete",
+  });
+  if (!confirmed) return;
   clearFeedback();
   sectionError.drinks = "";
   try {
@@ -855,7 +939,7 @@ onMounted(async () => {
               </div>
               <div v-else class="list">
                 <div v-for="user in users" :key="user._id" class="list-item">
-                  <div class="item-main">
+                  <div class="item-main" @click="openUserDetail(user)">
                     <p class="item-title">{{ user.name }}</p>
                     <p class="item-text email-text">{{ user.email }}</p>
                   </div>
@@ -993,7 +1077,7 @@ onMounted(async () => {
                   :key="booking._id"
                   class="list-item"
                 >
-                  <div class="item-main">
+                  <div class="item-main" @click="openBookingDetail(booking)">
                     <p class="item-title">{{ booking.name }}</p>
                     <p class="item-text email-text">
                       {{ booking.email }} • {{ booking.phone }}
@@ -1220,7 +1304,10 @@ onMounted(async () => {
               </div>
               <div v-else class="list">
                 <div v-for="drink in drinks" :key="drink._id" class="list-item">
-                  <div class="item-main product-main">
+                  <div
+                    class="item-main product-main"
+                    @click="openDrinkDetail(drink)"
+                  >
                     <img
                       v-if="drink.image"
                       :src="drink.image"
@@ -1262,6 +1349,279 @@ onMounted(async () => {
           </div>
         </div>
       </template>
+
+      <ConfirmDialog
+        v-model="confirmDialog.open"
+        :title="confirmDialog.title"
+        :message="confirmDialog.message"
+        :confirm-text="confirmDialog.confirmText"
+        cancel-text="Cancel"
+        :pending="confirmDialog.pending"
+        :danger="true"
+        @confirm="submitConfirmDialog"
+        @cancel="closeConfirmDialog"
+      />
+
+      <!-- Detail View Modal -->
+      <div
+        v-if="detailView.open"
+        class="modal-overlay detail-overlay"
+        @click.self="closeDetailView"
+      >
+        <div class="detail-card modal-content">
+          <div class="detail-header">
+            <h2 v-if="detailView.type === 'user'">User Details</h2>
+            <h2 v-else-if="detailView.type === 'booking'">Booking Details</h2>
+            <h2 v-else>Product Details</h2>
+            <button
+              class="btn-close"
+              @click="closeDetailView"
+              type="button"
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div class="detail-body">
+            <!-- User Details -->
+            <template v-if="detailView.type === 'user' && detailView.item">
+              <div class="detail-row">
+                <div class="detail-field">
+                  <span class="detail-label">Name</span>
+                  <span class="detail-value">{{ detailView.item.name }}</span>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-field">
+                  <span class="detail-label">Email</span>
+                  <span class="detail-value">{{ detailView.item.email }}</span>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-field">
+                  <span class="detail-label">Role</span>
+                  <span class="detail-value">{{
+                    detailView.item.role || "user"
+                  }}</span>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-field">
+                  <span class="detail-label">Verified</span>
+                  <span class="detail-value">{{
+                    detailView.item.verified ? "✓ Yes" : "Pending"
+                  }}</span>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-field">
+                  <span class="detail-label">User ID</span>
+                  <span class="detail-value detail-mono">{{
+                    detailView.item._id
+                  }}</span>
+                </div>
+              </div>
+            </template>
+
+            <!-- Booking Details -->
+            <template
+              v-else-if="detailView.type === 'booking' && detailView.item"
+            >
+              <div class="detail-row">
+                <div class="detail-field">
+                  <span class="detail-label">Name</span>
+                  <span class="detail-value">{{ detailView.item.name }}</span>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-field">
+                  <span class="detail-label">Email</span>
+                  <span class="detail-value">{{ detailView.item.email }}</span>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-field">
+                  <span class="detail-label">Phone</span>
+                  <span class="detail-value">{{ detailView.item.phone }}</span>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-field">
+                  <span class="detail-label">Date & Time</span>
+                  <span class="detail-value">{{
+                    formatDate(detailView.item.time)
+                  }}</span>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-field">
+                  <span class="detail-label">Guests</span>
+                  <span class="detail-value">{{ detailView.item.guests }}</span>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-field">
+                  <span class="detail-label">Status</span>
+                  <span
+                    class="detail-value"
+                    :class="statusBadgeClass(detailView.item.status)"
+                  >
+                    {{ formatBookingStatus(detailView.item.status) }}
+                  </span>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-field">
+                  <span class="detail-label">Channel</span>
+                  <span class="detail-value">{{
+                    detailView.item.channel || "direct"
+                  }}</span>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-field" style="grid-column: 1 / -1">
+                  <span class="detail-label">Items</span>
+                  <span class="detail-value">{{
+                    summarizeBookingItems(detailView.item.items)
+                  }}</span>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-field">
+                  <span class="detail-label">Booking ID</span>
+                  <span class="detail-value detail-mono">{{
+                    detailView.item._id
+                  }}</span>
+                </div>
+              </div>
+              <div v-if="detailView.item.createdAt" class="detail-row">
+                <div class="detail-field">
+                  <span class="detail-label">Created</span>
+                  <span class="detail-value">{{
+                    formatDate(detailView.item.createdAt)
+                  }}</span>
+                </div>
+              </div>
+            </template>
+
+            <!-- Product Details -->
+            <template
+              v-else-if="detailView.type === 'drink' && detailView.item"
+            >
+              <div class="detail-row">
+                <div class="detail-field" style="grid-column: 1 / -1">
+                  <div class="product-detail-image">
+                    <img
+                      v-if="detailView.item.image"
+                      :src="detailView.item.image"
+                      :alt="detailView.item.name"
+                    />
+                    <div v-else class="product-image-fallback">
+                      {{
+                        (detailView.item.name || "P").charAt(0).toUpperCase()
+                      }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-field">
+                  <span class="detail-label">Name</span>
+                  <span class="detail-value">{{ detailView.item.name }}</span>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-field">
+                  <span class="detail-label">Price</span>
+                  <span class="detail-value">{{
+                    formatCurrency(detailView.item.price)
+                  }}</span>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-field">
+                  <span class="detail-label">Stock</span>
+                  <span class="detail-value">{{ detailView.item.stock }}</span>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-field">
+                  <span class="detail-label">Available</span>
+                  <span class="detail-value">{{
+                    detailView.item.available ? "✓ Yes" : "No"
+                  }}</span>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-field">
+                  <span class="detail-label">Caffeine</span>
+                  <span class="detail-value">{{
+                    detailView.item.caffeine || "none"
+                  }}</span>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-field">
+                  <span class="detail-label">Temperature</span>
+                  <span class="detail-value">{{
+                    detailView.item.temp || "iced"
+                  }}</span>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-field">
+                  <span class="detail-label">Sweetness</span>
+                  <span class="detail-value"
+                    >{{ detailView.item.sweetness ?? 5 }}/10</span
+                  >
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-field">
+                  <span class="detail-label">Color Tone</span>
+                  <span class="detail-value">{{
+                    detailView.item.colorTone || "neutral"
+                  }}</span>
+                </div>
+              </div>
+              <div
+                v-if="detailView.item.tags && detailView.item.tags.length > 0"
+                class="detail-row"
+              >
+                <div class="detail-field" style="grid-column: 1 / -1">
+                  <span class="detail-label">Tags</span>
+                  <div class="detail-tags">
+                    <span
+                      v-for="tag in detailView.item.tags"
+                      :key="tag"
+                      class="tag"
+                    >
+                      {{ tag }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div v-if="detailView.item.desc" class="detail-row">
+                <div class="detail-field" style="grid-column: 1 / -1">
+                  <span class="detail-label">Description</span>
+                  <span class="detail-value" style="white-space: pre-wrap">{{
+                    detailView.item.desc
+                  }}</span>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-field">
+                  <span class="detail-label">Product ID</span>
+                  <span class="detail-value detail-mono">{{
+                    detailView.item._id
+                  }}</span>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
     </main>
   </section>
 </template>
@@ -1573,6 +1933,7 @@ onMounted(async () => {
 
 .item-main {
   min-width: 0;
+  cursor: pointer;
 }
 
 .product-main {
@@ -1853,5 +2214,200 @@ onMounted(async () => {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* =========================================
+   DETAIL VIEW MODAL STYLES
+   ========================================= */
+.detail-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  backdrop-filter: blur(3px);
+}
+
+.detail-card {
+  background: var(--paper);
+  width: 90%;
+  max-width: 600px;
+  max-height: 85vh;
+  overflow-y: auto;
+  margin: 0;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  animation: modalFadeIn 0.25s ease-out;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.admin-page.theme-dark .detail-card {
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+}
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  gap: 12px;
+}
+
+.admin-page.theme-dark .detail-header {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.detail-header h2 {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--tan);
+}
+
+.btn-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-size: 1.2rem;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.btn-close:hover {
+  background: rgba(184, 132, 67, 0.1);
+  color: var(--tan);
+}
+
+.admin-page.theme-dark .btn-close:hover {
+  background: rgba(214, 163, 90, 0.15);
+}
+
+.detail-body {
+  padding: 24px;
+}
+
+.detail-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.detail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detail-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.admin-page.theme-dark .detail-label {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.detail-value {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--ink);
+  word-break: break-word;
+}
+
+.detail-mono {
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+  font-size: 0.85rem;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.admin-page.theme-dark .detail-mono {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.detail-value.ok {
+  color: #27ae60;
+}
+
+.detail-value.danger {
+  color: var(--orange-strong);
+}
+
+.product-detail-image {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.product-detail-image img {
+  max-width: 100%;
+  height: auto;
+  max-height: 300px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.admin-page.theme-dark .product-detail-image img {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.product-image-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 200px;
+  height: 200px;
+  background: rgba(184, 132, 67, 0.1);
+  border: 1px solid rgba(184, 132, 67, 0.2);
+  border-radius: 8px;
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--tan);
+}
+
+.admin-page.theme-dark .product-image-fallback {
+  background: rgba(214, 163, 90, 0.1);
+  border-color: rgba(214, 163, 90, 0.2);
+}
+
+.detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.detail-tags .tag {
+  background: rgba(184, 132, 67, 0.15);
+  color: var(--tan);
+  border: 1px solid rgba(184, 132, 67, 0.3);
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.admin-page.theme-dark .detail-tags .tag {
+  background: rgba(214, 163, 90, 0.15);
+  color: #fff;
+  border-color: rgba(214, 163, 90, 0.3);
 }
 </style>

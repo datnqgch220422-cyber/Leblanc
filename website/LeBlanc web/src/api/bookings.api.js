@@ -35,6 +35,11 @@ export const getBookingPaymentStatusREST = (paymentOrderId) =>
 export const createBookingREST = (booking) =>
   apiClient.post("/bookings", booking).then((res) => res.data);
 
+export const cancelBookingREST = (id, email) =>
+  apiClient
+    .patch(`/bookings/${id}`, { email, status: "cancelled" })
+    .then((res) => res.data);
+
 export const getBookings = () =>
   USE_GRAPHQL ? getBookingsGraphQL() : getBookingsREST();
 
@@ -54,4 +59,12 @@ export const createBooking = (booking) => {
   }
 
   return createBookingREST({ ...booking, time: normalizedTime });
+};
+
+export const cancelBooking = (id, email) => {
+  if (USE_GRAPHQL) {
+    // GraphQL cancel not implemented; fallback to REST
+    return cancelBookingREST(id, email);
+  }
+  return cancelBookingREST(id, email);
 };

@@ -1,9 +1,10 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { getBookingsByEmail } from "@/api/bookings.api";
+import { getBookingsByEmail, cancelBooking } from "@/api/bookings.api";
 import { getDrinks } from "@/api/drinks.api";
 import { getSessionUser } from "@/composables/useSessionAuth";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -14,6 +15,14 @@ const bookings = ref([]);
 const drinks = ref([]);
 const loading = ref(false);
 const error = ref("");
+const message = reactive({
+  type: "",
+  text: "",
+});
+const confirmDialog = reactive({
+  open: false,
+  pending: false,
+});
 
 const booking = computed(
   () => bookings.value.find((b) => String(b._id) === String(bookingId)) || null,
@@ -67,6 +76,47 @@ const load = async () => {
 
 const goBack = () => router.push({ name: "orders" });
 
+const canCancel = (status) => {
+  const s = (status || "").toLowerCase();
+  return s === "pending" || s === "confirmed";
+};
+
+const handleCancel = async () => {
+  if (!user.value?.email) {
+    message.type = "error";
+    message.text = "You must be logged in to cancel.";
+    return;
+  }
+  const b = booking.value;
+  if (!b || !canCancel(b.status)) return;
+  confirmDialog.open = true;
+};
+
+const closeConfirmDialog = () => {
+  if (confirmDialog.pending) return;
+  confirmDialog.open = false;
+};
+
+const confirmCancel = async () => {
+  const b = booking.value;
+  if (!b) return;
+  confirmDialog.pending = true;
+  try {
+    await cancelBooking(b._id, user.value.email);
+    await load();
+    message.type = "success";
+    message.text = "Booking cancelled.";
+    confirmDialog.open = false;
+    goBack();
+  } catch (err) {
+    message.type = "error";
+    message.text =
+      err?.response?.data?.error || err?.message || "Could not cancel booking.";
+  } finally {
+    confirmDialog.pending = false;
+  }
+};
+
 onMounted(load);
 </script>
 
@@ -79,6 +129,10 @@ onMounted(load);
       </div>
       <button @click="goBack" class="btn btn--link">← Back to orders</button>
     </header>
+
+    <div v-if="message.text" :class="['notice', `notice--${message.type}`]">
+      {{ message.text }}
+    </div>
 
     <div v-if="loading">Loading...</div>
     <div v-else-if="error" class="error">{{ error }}</div>
@@ -108,8 +162,29 @@ onMounted(load);
           <p>Total items: {{ totals.count }}</p>
           <p>Total drinks price: {{ formatCurrency(totals.total) }}</p>
         </div>
+        <div style="margin-top: 12px">
+          <button
+            v-if="canCancel(booking.status)"
+            class="btn btn--danger"
+            @click="handleCancel"
+          >
+            Cancel booking
+          </button>
+        </div>
       </section>
     </div>
+
+    <ConfirmDialog
+      v-model="confirmDialog.open"
+      title="Cancel booking"
+      message="Are you sure you want to cancel this booking?"
+      :confirm-text="confirmDialog.pending ? 'Cancelling...' : 'Cancel booking'"
+      cancel-text="Keep booking"
+      :pending="confirmDialog.pending"
+      :danger="true"
+      @confirm="confirmCancel"
+      @cancel="closeConfirmDialog"
+    />
   </section>
 </template>
 
@@ -141,5 +216,35 @@ onMounted(load);
 }
 .error {
   color: #9d3412;
+}
+.notice {
+  margin: 10px 0 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+.notice--success {
+  color: #18592a;
+  background: rgba(24, 89, 42, 0.12);
+}
+.notice--error {
+  color: #9d3412;
+  background: rgba(157, 52, 18, 0.12);
+}
+.btn {
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btn--danger {
+  border-color: #9d3412;
+  color: #9d3412;
+}
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>

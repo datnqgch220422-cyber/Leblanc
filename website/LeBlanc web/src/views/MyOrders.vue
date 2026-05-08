@@ -1,9 +1,10 @@
 <script setup>
-import { computed, ref, onMounted } from "vue";
+import { computed, reactive, ref, onMounted } from "vue";
 import { RouterLink } from "vue-router";
-import { getBookingsByEmail } from "@/api/bookings.api";
+import { getBookingsByEmail, cancelBooking } from "@/api/bookings.api";
 import { getSessionUser } from "@/composables/useSessionAuth";
 import { getDrinks } from "@/api/drinks.api";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 const user = ref(getSessionUser());
 const bookings = ref([]);
@@ -11,6 +12,15 @@ const drinks = ref([]);
 const loading = ref(false);
 const error = ref("");
 const selectedStatus = ref(null);
+const message = reactive({
+  type: "",
+  text: "",
+});
+const confirmDialog = reactive({
+  open: false,
+  booking: null,
+  pending: false,
+});
 
 const statusOptions = [
   { value: null, label: "All" },
@@ -120,6 +130,48 @@ const load = async () => {
   }
 };
 
+const canCancel = (status) => {
+  const s = (status || "").toLowerCase();
+  return s === "pending" || s === "confirmed";
+};
+
+const handleCancel = async (booking) => {
+  if (!user.value?.email) {
+    message.type = "error";
+    message.text = "You must be logged in to cancel.";
+    return;
+  }
+  if (!canCancel(booking.status)) return;
+  confirmDialog.booking = booking;
+  confirmDialog.open = true;
+};
+
+const closeConfirmDialog = () => {
+  if (confirmDialog.pending) return;
+  confirmDialog.open = false;
+  confirmDialog.booking = null;
+};
+
+const confirmCancel = async () => {
+  const booking = confirmDialog.booking;
+  if (!booking) return;
+  confirmDialog.pending = true;
+  try {
+    await cancelBooking(booking._id, user.value.email);
+    await load();
+    message.type = "success";
+    message.text = "Booking cancelled.";
+    confirmDialog.open = false;
+    confirmDialog.booking = null;
+  } catch (err) {
+    message.type = "error";
+    message.text =
+      err?.response?.data?.error || err?.message || "Could not cancel booking.";
+  } finally {
+    confirmDialog.pending = false;
+  }
+};
+
 onMounted(load);
 </script>
 
@@ -129,6 +181,10 @@ onMounted(load);
       <h1>My Orders</h1>
       <p class="muted">Review your past orders and their status.</p>
     </header>
+
+    <div v-if="message.text" :class="['notice', `notice--${message.type}`]">
+      {{ message.text }}
+    </div>
 
     <div v-if="loading">Loading...</div>
     <div v-else-if="error" class="error">{{ error }}</div>
@@ -166,9 +222,30 @@ onMounted(load);
           <p>Total drinks price: {{ formatCurrency(b.summary.total) }}</p>
           <p :class="statusClass(b.status)">{{ formatStatus(b.status) }}</p>
           <p>Channel: {{ b.channel || "web" }}</p>
+          <div>
+            <button
+              v-if="canCancel(b.status)"
+              class="btn btn--danger"
+              @click.prevent="handleCancel(b)"
+            >
+              Cancel booking
+            </button>
+          </div>
         </article>
       </div>
     </div>
+
+    <ConfirmDialog
+      v-model="confirmDialog.open"
+      title="Cancel booking"
+      message="Are you sure you want to cancel this booking?"
+      :confirm-text="confirmDialog.pending ? 'Cancelling...' : 'Cancel booking'"
+      cancel-text="Keep booking"
+      :pending="confirmDialog.pending"
+      :danger="true"
+      @confirm="confirmCancel"
+      @cancel="closeConfirmDialog"
+    />
   </section>
 </template>
 
@@ -262,5 +339,35 @@ onMounted(load);
   color: rgba(0, 0, 0, 0.6);
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.02);
+}
+.notice {
+  margin: 10px 0 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+.notice--success {
+  color: #18592a;
+  background: rgba(24, 89, 42, 0.12);
+}
+.notice--error {
+  color: #9d3412;
+  background: rgba(157, 52, 18, 0.12);
+}
+.btn {
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btn--danger {
+  border-color: #9d3412;
+  color: #9d3412;
+}
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>

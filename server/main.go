@@ -38,6 +38,7 @@ func main() {
 	r.GET("/bookings/payment-status", handlers.GetBookingPaymentStatus)
 	r.GET("/bookings", handlers.GetBookings)
 	r.POST("/bookings", handlers.CreateBooking)
+	r.PATCH("/bookings/:id", handlers.CancelBooking)
 	r.GET("/booking-addons", handlers.GetCart)
 	r.POST("/booking-addons/items", handlers.AddCartItem)
 	r.PUT("/booking-addons/items", handlers.UpdateCartItem)
